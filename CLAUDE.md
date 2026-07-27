@@ -1,5 +1,10 @@
 # CLAUDE.md
 
+## Other CLAUDE.md Files in This Repo
+
+The `CLAUDE.md` file in `src\docket\templates\CLAUDE.md` is *not* for you.
+It is a template provided when Docket is deployed.
+
 ## Code Style
 
 Match existing style exactly:

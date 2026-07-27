@@ -36,9 +36,11 @@ def testCliWithNoCommandIsAUsageError() -> None:
     assert cli.main([]) == 2
 
 
-def testServerEntryPointIsCallable() -> None:
+def testServerEntryPointResolves() -> None:
     """
-    The `docket-mcp` entry point resolves and runs, even before the server itself exists.
+    The `docket-mcp` entry point exists and is callable.
+
+    It is not invoked here, because calling it hands the process to the stdio transport and blocks on stdin.
     """
 
-    assert server.main([]) == 1
+    assert callable(server.main)

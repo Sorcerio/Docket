@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Iterator, Optional
 
 from docket.core.config import Config
-from docket.core.errors import DuplicateIdError, InvalidPriorityError, InvalidStatusError, TicketNotFoundError, TicketParseError
+from docket.core.errors import InvalidPriorityError, InvalidStatusError, TicketNotFoundError, TicketParseError
 from docket.core.ids import buildFilename, nextId, parseId, requireValidKey
 from docket.core.ticket import STATUS_DONE, STATUSES, Ticket, buildBody, parseTicket, serializeTicket
 

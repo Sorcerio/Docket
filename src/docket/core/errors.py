@@ -45,9 +45,11 @@ class InvalidIdError(DocketError):
     """
 
 
-class DuplicateIdError(DocketError):
+class DeployError(DocketError):
     """
-    Raised when two tickets claim the same id.
+    Raised when docket cannot be installed into a consumer repository.
+
+    This covers a target that is not a directory, and an existing `.mcp.json` that cannot be safely merged into.
     """
 
 
