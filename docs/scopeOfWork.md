@@ -166,6 +166,51 @@ Rejected: `uvx` on demand, which avoids the install step at the cost of a cold-s
 
 Rejected: vendoring the tool into each consumer repository, which is hermetic but means the tool's own source appears in every consumer's diffs and upgrades become a manual copy per repository.
 
+### Tickets are mutable through the tool, not by hand
+
+The deployed `CLAUDE.md` tells an agent never to hand-edit ticket files, so the tool must supply a path for every field an agent legitimately needs to change.
+`title`, `priority`, and `requires` all change over a ticket's life as work is retriaged and dependencies are discovered.
+
+`docket set` and the MCP tool `update_ticket` cover exactly those three fields.
+`status` is deliberately excluded, because changing it moves the file and that already belongs to `docket status` and `set_status`.
+The filename is excluded because filenames are frozen at creation.
+
+This is an addition to the surface originally specified here, made because the original surface was write-once and contradicted its own instruction against hand-editing.
+It is not an invitation to keep growing the surface. Nothing beyond these three fields is mutable through the tool.
+
+### The status vocabulary is fixed in the tool
+
+`todo`, `wip`, and `done`, hardcoded.
+
+An earlier draft of the configuration carried a `statuses` list, which contradicted this document's own non-goal of not being a workflow engine.
+It also could not survive contact with the directory projection rule, since `done` is the only status that moves a file and a configurable list cannot express that without becoming a state machine.
+The key is gone from the configuration entirely rather than being read and ignored.
+
+`doneDir` and `todoDir` remain configurable, since those are path choices rather than vocabulary.
+
+### Resolved implementation decisions
+
+These were open after the first read of this document and are now settled.
+
+- Configuration is found by walking up from the current directory and stopping at the git root. A parent repository's `.docket.toml` is never picked up. Failure to find one reports the directories searched.
+- A `requires` entry naming an id that does not exist yet is a warning at creation time, not a hard error, so an agent writing a batch out of order is never stranded mid-batch. It remains an error in `validate`, which is expected to run after every batch.
+- `deploy` is idempotent. It creates missing directories, writes `CLAUDE.md`, and merges `.mcp.json`, but never rewrites an existing `.docket.toml`, because that file holds the key registry.
+- Every MCP tool returns a JSON object encoded as text, including `graph`, where the mermaid source is a string field rather than the whole payload. Structured output is unambiguous for the model and testable.
+- A created ticket's body is `# <title>`, a blank line, then the supplied body verbatim. If the supplied body already opens with an H1, it is used as-is and no second heading is added.
+- This repository does not deploy docket into itself. Docket's own development is tracked with ordinary commits, and `deploy` is verified against a scratch repository instead.
+
+### Presentation is `rich`, and only in the CLI
+
+`rich` and `rich-argparse` give the CLI readable tables, help, and error output for very little code.
+
+The boundary is hard:
+
+- `core/` still never prints. Unchanged.
+- `server.py` must never import `rich` and must never write to stdout at all. MCP stdio owns stdout, and a single stray escape sequence corrupts the protocol. Server diagnostics go to stderr.
+- Machine-readable CLI output, meaning mermaid source to stdout or to `--out`, bypasses `rich` and goes through a plain writer, so no wrapping, highlighting, or ANSI escapes leak into a pipe.
+
+`rich` already suppresses color on a non-tty and honors `NO_COLOR`, so no extra flag is needed.
+
 ## Ticket format
 
 ```markdown
@@ -190,7 +235,7 @@ Field reference:
 |---|---|---|---|
 | `id` | string | yes | `<KEY>-<NUM>`. Must match the filename prefix. |
 | `title` | string | yes | Free text. May change without renaming the file. |
-| `status` | enum | yes | `todo`, `wip`, or `done`. |
+| `status` | enum | yes | `todo`, `wip`, or `done`. The vocabulary is fixed in the tool, not configurable. |
 | `priority` | int | yes | `0` most urgent. Defaults to config `defaultPriority` on creation. |
 | `requires` | list of id | yes | May be empty. Never lists what this ticket blocks. |
 
@@ -199,6 +244,21 @@ Anything else present is preserved verbatim on rewrite.
 Filename: `CORE-14_skirmishSetup.md`.
 The id, then an underscore, then a camelCase slug derived from the title.
 The camelCase slug matches the convention the source repo used and this repo's own code style.
+
+### Slug generation
+
+A title is free text supplied by a human or an agent, so it cannot be trusted as a filename fragment.
+`slugify` in `ids.py` is a pure function and the only thing permitted to produce a slug.
+
+1. Normalize the title with Unicode NFKD, strip combining marks, and drop any non-ASCII character that survives.
+2. Split on every run of characters outside `[A-Za-z0-9]`. This is an allowlist, so path separators, `..`, quotes, null bytes, and control characters are discarded as a consequence of the rule rather than by an explicit blocklist that can be outgrown.
+3. Lowercase the first token entirely. For every later token, uppercase the first character and lowercase the rest, so `HTTP API client` becomes `httpApiClient`.
+4. Truncate to 48 characters, at a token boundary when one is available and with a hard cut otherwise.
+5. If nothing survives, because the title was entirely emoji, CJK, or punctuation, fall back to `untitled`.
+
+Windows reserved device names need no special handling, since the filename is always `<ID>_<slug>.md` and the id prefix means the stem can never equal `CON` or `NUL`.
+Case-insensitive filename collisions need no special handling either, because the id prefix is already unique.
+The function must be tested against a table of hostile inputs, not only well-formed titles.
 
 Serialization notes for the implementer:
 
@@ -217,7 +277,6 @@ doneDir = "done"
 todoDir = "todo"
 defaultPriority = 2
 maxPriority = 4
-statuses = ["todo", "wip", "done"]
 
 [keys]
 CORE = "tactical-sim core"
@@ -258,7 +317,8 @@ docs/
   scopeOfWork.md  this document
 ```
 
-Dependencies: the `mcp` Python SDK, `pyyaml` for frontmatter, and `tomlkit` for configuration.
+Dependencies: the `mcp` Python SDK, `pyyaml` for frontmatter, `tomlkit` for configuration, and `rich` with `rich-argparse` for CLI presentation.
+Testing uses `pytest`.
 No JavaScript, no TypeScript, no npm, and no Rust bindings.
 
 ## Core library responsibilities
@@ -272,6 +332,7 @@ It exposes functions that both shells call, and it never prints, never reads `ar
 - Allocate the next id for a given key by scanning existing ids.
 - Generate a filename slug from a title.
 - Change a ticket's status, performing the directory move as part of the same operation.
+- Change a ticket's `title`, `priority`, and `requires` in place, leaving the filename and the body untouched.
 - Resolve the dependency graph, producing reverse edges by scanning forward ones.
 - Traverse the graph from a ticket or across a key.
 - Render a resolved graph as mermaid source.
@@ -291,7 +352,7 @@ Errors:
 - A ticket whose `id` does not match its filename prefix.
 - A ticket whose `status` does not agree with the directory it sits in.
 - A `priority` outside `0` through `maxPriority`.
-- A `status` outside the configured vocabulary.
+- A `status` outside `todo`, `wip`, `done`.
 
 Warnings:
 
@@ -306,6 +367,7 @@ Warnings:
 docket new --key CORE --title "Skirmish setup" [--requires CORE-9,GEN-3] [--priority 1]
 docket show CORE-14
 docket list [--status todo] [--key CORE] [--priority-max 2]
+docket set CORE-14 [--title "New title"] [--priority 0] [--requires CORE-9,GEN-3]
 docket status CORE-14 done
 docket graph [--id CORE-14 | --key GEN] [--out FILE]
 docket key list [--proposed]
@@ -319,6 +381,7 @@ docket upgrade PATH
 Notes:
 
 - `show` prints the body along with resolved dependency context, not the raw file. Use `cat` for the raw file.
+- `set` changes `title`, `priority`, and `requires` only. It never changes `status`, which belongs to `docket status`, and it never renames the file, since filenames are frozen at creation.
 - `graph` writes mermaid source to stdout by default, or to a file with `--out`.
 - `key reject` must fail loudly if tickets already use the key, and name them.
 - `upgrade` rewrites the deployed templates in a consumer repository without touching its tickets or its key registry.
@@ -332,6 +395,7 @@ A stdio server, built on the `mcp` Python SDK.
 | `list_tickets(status?, key?, priority_max?)` | Summaries only. Id, title, status, priority, key. Never full bodies. |
 | `read_ticket(id)` | Full body plus resolved dependency context. |
 | `create_ticket(key, title, body, requires?, priority?)` | Allocates the id, writes the file, returns the new id. |
+| `update_ticket(id, title?, priority?, requires?)` | Changes only these three fields. Never status, never the filename. |
 | `set_status(id, status)` | Updates frontmatter and performs the directory move together. |
 | `graph(id?, key?)` | Returns mermaid source as a string. |
 | `list_keys()` | Registered and proposed keys with their descriptions. |
