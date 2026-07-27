@@ -10,7 +10,7 @@ A consumer repository receives ticket data and configuration. It never receives 
 Once per machine:
 
 ```
-uv tool install git+https://github.com/<owner>/docket
+uv tool install git+https://github.com/Sorcerio/Docket
 ```
 
 That provides two console scripts, `docket` for humans and CI, and `docket-mcp` for agents.
