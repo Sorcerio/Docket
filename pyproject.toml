@@ -4,4 +4,15 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "mcp>=1.28.1",
+    "pyyaml>=6.0.3",
+    "rich>=15.0.0",
+    "rich-argparse>=1.8.0",
+    "tomlkit>=0.15.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
