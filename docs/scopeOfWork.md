@@ -300,6 +300,8 @@ Hand-rolling a writer is worse still, since hand-rolled TOML writers accumulate 
 ```
 src/docket/
   core/
+    errors.py     the DocketError hierarchy every module raises
+    fields.py     typed reading of untrusted mapping fields
     ticket.py     Ticket dataclass, parse, serialize
     ids.py        key parsing, next-number allocation, slug generation
     store.py      discovery, load-all, write, status moves
@@ -316,6 +318,11 @@ tests/
 docs/
   scopeOfWork.md  this document
 ```
+
+`errors.py` and `fields.py` are not in the original layout and were added during implementation.
+Exceptions needed one home rather than being scattered across the modules that raise them.
+`fields.py` exists because frontmatter parsing and configuration parsing both read a mapping written by a human or an agent and both need the same presence and type checks, differing only in which exception they raise.
+It is also the single boundary where a parsed value is narrowed to an exact builtin type, which matters because `tomlkit` returns `str` and `int` subclasses while `pyyaml` dispatches its representers on exact type.
 
 Dependencies: the `mcp` Python SDK, `pyyaml` for frontmatter, `tomlkit` for configuration, and `rich` with `rich-argparse` for CLI presentation.
 Testing uses `pytest`.
