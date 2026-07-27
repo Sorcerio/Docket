@@ -14,3 +14,14 @@ Match existing style exactly:
 - Class body order: Properties, Initializer, Python Functions (dunders), Private Functions, Functions.
 - No em dashes anywhere, in code, comments, docs, or output.
 - Never break a line mid-sentence in prose/docs/comments. One sentence stays on one line, word wrap handles width.
+
+## Naming across interfaces
+
+camelCase is the repo-wide Python convention above. Two external interfaces do NOT follow it, on purpose:
+
+- **MCP tool names and their parameters are snake_case** (`list_tickets`, `read_ticket`, `set_status`, `propose_key`, `priority_max`). That is the MCP ecosystem convention and it is what the model sees. Never expose a camelCase tool name or param.
+- Ticket frontmatter keys are lowercase data keys (`id`, `title`, `status`, `priority`, `requires`).
+
+TOML config keys stay camelCase, matching the repo style.
+
+Keep the snake_case-to-camelCase mapping explicit in `server.py`. Neither convention leaks into the other.
