@@ -9,7 +9,7 @@ A consumer repository receives ticket data and configuration. It never receives 
 
 Once per machine:
 
-```
+```bash
 uv tool install git+https://github.com/Sorcerio/Docket
 ```
 
@@ -17,7 +17,7 @@ That provides two console scripts, `docket` for humans and CI, and `docket-mcp` 
 
 ## Deploy into a repository
 
-```
+```bash
 cd my-project
 docket deploy .
 ```
@@ -73,7 +73,7 @@ The filename is `CORE-14_skirmishSetup.md`, frozen at creation. Retitling does n
 
 ## CLI
 
-```
+```bash
 docket new --key CORE --title "Skirmish setup" [--requires CORE-9,GEN-3] [--priority 1] [--body TEXT]
 docket show CORE-14
 docket list [--status todo] [--key CORE] [--priority-max 2]
@@ -142,7 +142,7 @@ Warnings: a key that is proposed but not approved, and a proposed key no ticket 
 
 ## Development
 
-```
+```bash
 uv sync
 uv run pytest
 uv run docket --help
