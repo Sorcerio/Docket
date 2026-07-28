@@ -7,6 +7,21 @@ A consumer repository receives ticket data and configuration. It never receives 
 
 ![Docket demo](docs/demo/docket.gif)
 
+* [docket](#docket)
+    * [Install](#install)
+    * [Deploy into a Repository](#deploy-into-a-repository)
+    * [What a Ticket Looks Like](#what-a-ticket-looks-like)
+    * [Three Ideas Worth Knowing](#three-ideas-worth-knowing)
+    * [CLI](#cli)
+    * [MCP](#mcp)
+    * [Configuration](#configuration)
+    * [Validation Rules](#validation-rules)
+    * [Development](#development)
+        * [Working on the Repo](#working-on-the-repo)
+        * [Local Installation](#local-installation)
+
+---
+
 ## Install
 
 Once per machine:
@@ -148,6 +163,8 @@ Errors: a `requires` entry naming an id that does not exist, a dependency cycle,
 
 ## Development
 
+### Working on the Repo
+
 ```bash
 uv sync
 uv run pytest
@@ -155,3 +172,16 @@ uv run docket --help
 ```
 
 The core library holds every rule. The CLI and the MCP server are thin shells over it and contain no logic of their own, which is what keeps the two surfaces from ever disagreeing.
+
+### Local Installation
+
+You can install Docket as a tool from your repo root:
+
+```bash
+cd /your/repo/root/
+uv tool install .
+```
+
+When adding new files, changing primary version number, and making other changes, unexpected behavior can occur.
+
+Avoid this by updating your installation by running the install command again.
