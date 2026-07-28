@@ -260,6 +260,65 @@ def testSetRejectsTheSentinelMixedWithIds(inRepo: Path, capsys: pytest.CaptureFi
     assert "requires: [CORE-1]" in path.read_text(encoding="utf-8")
 
 
+@pytest.mark.parametrize("command", [["new", "--key", "CORE", "--title", ""], ["set", "CORE-1", "--title", "   "]])
+def testEmptyTitleIsRefused(inRepo: Path, capsys: pytest.CaptureFixture[str], command: list[str]) -> None:
+    """
+    A POSIX shell passes an empty string through, so an empty title would otherwise be written and frozen into the filename as `untitled`.
+
+    command: The invocation under test.
+    """
+
+    main(["new", "--key", "CORE", "--title", "Original"])
+    capsys.readouterr()
+
+    assert main(command) == EXIT_USAGE
+    assert "title cannot be empty" in capsys.readouterr().err
+
+    # Nothing was written, so the only ticket is still the one created above.
+    assert len(list((inRepo / "docs" / "tickets" / "todo").glob("*.md"))) == 1
+
+
+def testEmptyKeyDescriptionIsRefused(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The description is the whole of what a key registry tells a later reader, so registering one without it is refused.
+    """
+
+    assert main(["key", "add", "NEW", ""]) == EXIT_USAGE
+    assert "description cannot be empty" in capsys.readouterr().err
+
+    assert main(["key", "list"]) == EXIT_OK
+    assert "NEW" not in capsys.readouterr().out
+
+
+def testGraphRefusesAnUnwritableOutPath(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    An empty path used to resolve to the working directory and reach `write_text` as a directory, surfacing as a traceback rather than as a message.
+    """
+
+    main(["new", "--key", "CORE", "--title", "Skirmish setup"])
+    capsys.readouterr()
+
+    assert main(["graph", "--out", ""]) == EXIT_USAGE
+    assert "cannot be empty" in capsys.readouterr().err
+
+    assert main(["graph", "--out", str(inRepo)]) == EXIT_USAGE
+    assert "is a directory" in capsys.readouterr().err
+
+
+def testGraphWritesToANestedOutPath(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    A destination under directories that do not exist yet is created on the way, which the check must not have broken.
+    """
+
+    main(["new", "--key", "CORE", "--title", "Skirmish setup"])
+    capsys.readouterr()
+
+    target: Path = inRepo / "build" / "graphs" / "docket.mmd"
+
+    assert main(["graph", "--out", str(target)]) == EXIT_OK
+    assert "graph TD" in target.read_text(encoding="utf-8")
+
+
 def testStatusMovesTheFile(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """
     The frontmatter and the directory are written together, never one without the other.

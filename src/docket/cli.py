@@ -23,6 +23,7 @@ from docket.core.config import Config, discoverConfig
 from docket.core.deploy import DeployReport, deploy, upgrade
 from docket.core.errors import DocketError, InvalidIdError
 from docket.core.graph import ResolvedGraph, dependencyContext, resolveGraph, subgraphForId, subgraphForKey
+from docket.core.inputs import requireWritableFile, writeFile
 from docket.core.mermaid import renderGraph
 from docket.core.store import Store, TicketResult, TicketSet
 from docket.core.ticket import STATUSES, Ticket
@@ -43,6 +44,9 @@ STATUS_STYLES: dict[str, str] = {"todo": "dim", "wip": "yellow", "done": "green"
 
 # The word that clears a comma-separated list argument. An id can never collide with it, since every id is an uppercase key followed by a hyphen and a number.
 CLEAR_SENTINEL: str = "none"
+
+# How the graph destination is named when a message has to talk about it.
+OUT_ARGUMENT: str = "--out path"
 
 # MARK: Classes
 
@@ -399,9 +403,8 @@ def commandGraph(args: argparse.Namespace, store: Store, output: Output) -> int:
     source: str = renderGraph(graph)
 
     if args.out is not None:
-        outPath: Path = Path(args.out)
-        outPath.parent.mkdir(parents=True, exist_ok=True)
-        outPath.write_text(source, encoding="utf-8", newline="\n")
+        # Check the destination before rendering work is spent on it, and translate whatever the filesystem still refuses, so no write failure reaches the user as a traceback.
+        outPath: Path = writeFile(requireWritableFile(args.out, OUT_ARGUMENT), source, OUT_ARGUMENT)
         output.print(f"Wrote {outPath}")
 
         return EXIT_OK

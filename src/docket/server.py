@@ -113,7 +113,7 @@ def createTicket(
     A `requires` entry naming a ticket that does not exist yet is a warning rather than a failure, so a batch written out of order still completes. Call `validate` once the batch is done.
 
     key: The key to mint under, for example CORE.
-    title: The ticket title. The filename derives from this once, at creation, and never changes afterwards.
+    title: The ticket title, which cannot be empty. The filename derives from this once, at creation, and never changes afterwards.
     body: Markdown prose for the body, placed under a heading built from the title.
     requires: Ids this ticket depends on.
     priority: 0 is most urgent. Defaults to the repository's configured default.
@@ -137,7 +137,7 @@ def updateTicket(
     Only the fields supplied are touched. Status is not changeable here, because changing it moves the file, which is `set_status`. The filename never changes, even when the title does, so prose cross-references elsewhere stay intact.
 
     id: The ticket id.
-    title: A new title.
+    title: A new title, which cannot be empty.
     priority: A new priority. 0 is most urgent.
     requires: A replacement dependency list. Pass an empty list to clear it.
     """
@@ -209,7 +209,7 @@ def addKey(key: str, description: str, rationale: str) -> str:
     The key is written into the repository's configuration, where it shows up in the git diff.
 
     key: The new key. Uppercase alphanumeric, starting with a letter, for example META.
-    description: What this key groups, shown alongside the other keys.
+    description: What this key groups, shown alongside the other keys. It cannot be empty.
     rationale: Why a new key is needed. This is written as a comment above the key, so a later reader sees the reasoning.
     """
 

@@ -13,6 +13,7 @@ from typing import Iterator, Optional
 from docket.core.config import Config
 from docket.core.errors import InvalidPriorityError, InvalidStatusError, TicketNotFoundError, TicketParseError
 from docket.core.ids import buildFilename, nextId, parseId, requireValidKey
+from docket.core.inputs import requireText
 from docket.core.ticket import STATUS_DONE, STATUSES, Ticket, buildBody, parseTicket, serializeTicket
 
 # MARK: Constants
@@ -313,6 +314,9 @@ class Store:
         Returns the written ticket and any warnings.
         """
 
+        # The filename slug derives from the title once, here, so an empty one is frozen into the filename as well as the field.
+        requireText(title, "title")
+
         # A key must be registered before anything is minted under it, and the error names `add_key` as the way out.
         requireValidKey(key)
         self.config.requireKnownKey(key)
@@ -357,7 +361,7 @@ class Store:
         ticket: Ticket = existing.get(ticketId)
 
         if title is not None:
-            ticket.title = title
+            ticket.title = requireText(title, "title")
 
         if priority is not None:
             self.__requireValidPriority(priority)
