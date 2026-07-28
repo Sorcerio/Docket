@@ -151,5 +151,3 @@ uv run docket --help
 ```
 
 The core library holds every rule. The CLI and the MCP server are thin shells over it and contain no logic of their own, which is what keeps the two surfaces from ever disagreeing.
-
-`docs/scopeOfWork.md` records the design decisions, the reasoning behind each, and the alternatives that were rejected. Read it before changing behavior.

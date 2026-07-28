@@ -16,3 +16,5 @@ maxPriority = 4
 # Add a key here with a short description of what it covers, or run `docket key add <KEY> "<DESCRIPTION>"`. A key must exist before tickets can use it.
 # An agent adds one through add_key, which it is told to do only after asking you first.
 [keys]
+BUG = "Tickets that are for bugs"
+FEAT = "Tickets that are for future features"
