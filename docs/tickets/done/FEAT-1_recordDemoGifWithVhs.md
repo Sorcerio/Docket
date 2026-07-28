@@ -1,7 +1,7 @@
 ---
 id: FEAT-1
 title: Record demo GIF with VHS
-status: todo
+status: done
 priority: 2
 requires: []
 ---
