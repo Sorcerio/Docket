@@ -15,6 +15,9 @@ maxPriority = 4
 # Keys group related work. A ticket id is <KEY>-<NUM>.
 # Add a key here with a short description of what it covers, or run `docket key add <KEY> "<DESCRIPTION>"`. A key must exist before tickets can use it.
 # An agent adds one through add_key, which it is told to do only after asking you first.
+#
+# Do not add a DOCK key here. It is reserved for the README demo recording.
+# docs/demo/docket.tape registers it, uses DOCK-1 through DOCK-3, and removes it again on every render.
 [keys]
 BUG = "Tickets that are for bugs"
 FEAT = "Tickets that are for future features"
