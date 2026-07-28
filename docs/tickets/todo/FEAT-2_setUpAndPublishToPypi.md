@@ -13,6 +13,7 @@ Get Docket published on PyPI as an installable package.
 Depends on FEAT-1 (demo GIF) being done first, since the README should look finished before it's the thing people see on the PyPI project page.
 
 Covers:
+- Update the `README.md` to convey that _this very repo_ uses Docket to manage its own development
 - Confirm `docket` is available as a package name on PyPI (fallback name if not, e.g. `python-docket`)
 - Add a LICENSE file and pick a license (MIT or Apache-2.0), reflect it in `pyproject.toml`
 - Fill in missing `pyproject.toml` metadata: `authors`, `license`, `classifiers`, `keywords`, `[project.urls]` (Homepage/Repository/Issues)
