@@ -1,7 +1,7 @@
 ---
 id: BUG-2
 title: Cannot Clear With Set Command
-status: todo
+status: done
 priority: 0
 requires: []
 ---

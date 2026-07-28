@@ -21,7 +21,7 @@ from rich_argparse import RichHelpFormatter
 from docket import __version__
 from docket.core.config import Config, discoverConfig
 from docket.core.deploy import DeployReport, deploy, upgrade
-from docket.core.errors import DocketError
+from docket.core.errors import DocketError, InvalidIdError
 from docket.core.graph import ResolvedGraph, dependencyContext, resolveGraph, subgraphForId, subgraphForKey
 from docket.core.mermaid import renderGraph
 from docket.core.store import Store, TicketResult, TicketSet
@@ -40,6 +40,9 @@ EXIT_USAGE: int = 2
 
 # Styles for the status column, matching the intent of the mermaid classes without depending on them.
 STATUS_STYLES: dict[str, str] = {"todo": "dim", "wip": "yellow", "done": "green"}
+
+# The word that clears a comma-separated list argument. An id can never collide with it, since every id is an uppercase key followed by a hyphen and a number.
+CLEAR_SENTINEL: str = "none"
 
 # MARK: Classes
 
@@ -141,7 +144,7 @@ def buildParser() -> argparse.ArgumentParser:
     setParser.add_argument("id", help="The ticket id.")
     setParser.add_argument("--title", help="A new title. The filename does not follow it, since filenames are frozen at creation.")
     setParser.add_argument("--priority", type=int, help="A new priority.")
-    setParser.add_argument("--requires", help="A replacement comma-separated dependency list. Pass an empty string to clear it.")
+    setParser.add_argument("--requires", help=f"A replacement comma-separated dependency list. Pass '{CLEAR_SENTINEL}' to clear it.")
 
     statusParser: argparse.ArgumentParser = commands.add_parser("status", help="Change a ticket's status, moving its file to match.", formatter_class=RichHelpFormatter)
     statusParser.add_argument("id", help="The ticket id.")
@@ -547,7 +550,7 @@ def parseIdList(value: Optional[str]) -> Optional[list[str]]:
     """
     Split a comma-separated id list.
 
-    An empty string yields an empty list rather than `None`, which is how `set --requires ""` clears a ticket's dependencies.
+    Both `none` and an empty string yield an empty list rather than `None`, which is how `set --requires` clears a ticket's dependencies. The sentinel exists because PowerShell discards an empty-string argument before the process ever sees it, leaving the documented empty-string form unreachable on Windows.
 
     value: The raw argument value.
 
@@ -557,7 +560,16 @@ def parseIdList(value: Optional[str]) -> Optional[list[str]]:
     if value is None:
         return None
 
-    return [entry.strip() for entry in value.split(",") if entry.strip()]
+    entries: list[str] = [entry.strip() for entry in value.split(",") if entry.strip()]
+
+    # The sentinel clears the whole list, so mixing it with real ids asks for two contradictory things at once.
+    if any(entry.lower() == CLEAR_SENTINEL for entry in entries):
+        if len(entries) > 1:
+            raise InvalidIdError(f"'{CLEAR_SENTINEL}' clears the whole list, so it cannot be combined with an id. Pass either '{CLEAR_SENTINEL}' alone or only ids.")
+
+        return []
+
+    return entries
 
 
 def relativeToRoot(path: Optional[Path], root: Path) -> str:

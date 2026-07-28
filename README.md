@@ -79,7 +79,7 @@ The filename is `CORE-14_skirmishSetup.md`, frozen at creation. Retitling does n
 docket new --key CORE --title "Skirmish setup" [--requires CORE-9,GEN-3] [--priority 1] [--body TEXT]
 docket show CORE-14
 docket list [--status todo] [--key CORE] [--priority-max 2]
-docket set CORE-14 [--title TEXT] [--priority N] [--requires A,B]
+docket set CORE-14 [--title TEXT] [--priority N] [--requires A,B|none]
 docket status CORE-14 done
 docket graph [--id CORE-14 | --key GEN] [--out FILE]
 docket key list
@@ -91,6 +91,8 @@ docket upgrade PATH
 ```
 
 `show` prints the body with resolved dependency context, not the raw file. Use `cat` for that.
+
+`set --requires none` clears a ticket's dependencies.
 
 `graph` writes bare mermaid source to stdout, so it pipes and redirects cleanly. GitHub and most editors render it natively.
 

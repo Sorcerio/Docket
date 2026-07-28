@@ -14,6 +14,7 @@ import pytest
 
 from docket.cli import EXIT_INVALID, EXIT_OK, EXIT_USAGE, main, parseIdList
 from docket.core.config import Config, loadConfig
+from docket.core.errors import InvalidIdError
 
 # MARK: Fixtures
 
@@ -209,7 +210,7 @@ def testSetWithNothingToChangeIsAUsageError(inRepo: Path, capsys: pytest.Capture
 
 def testSetCanClearDependencies(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """
-    An empty string clears the list, which is the only way to express "no dependencies" on the command line.
+    An empty string clears the list, which is how "no dependencies" is expressed in a shell that can pass one.
     """
 
     main(["new", "--key", "CORE", "--title", "First"])
@@ -221,6 +222,42 @@ def testSetCanClearDependencies(inRepo: Path, capsys: pytest.CaptureFixture[str]
     path: Path = inRepo / "docs" / "tickets" / "todo" / "CORE-2_second.md"
 
     assert "requires: []" in path.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("sentinel", ["none", "NONE", " None "])
+def testSetClearsDependenciesWithTheSentinel(inRepo: Path, capsys: pytest.CaptureFixture[str], sentinel: str) -> None:
+    """
+    PowerShell discards an empty-string argument before the process sees it, so the sentinel is the form that reaches the parser in every shell. Case and surrounding space do not matter, since a user typing it is not typing an id.
+
+    sentinel: The spelling of the clearing word under test.
+    """
+
+    main(["new", "--key", "CORE", "--title", "First"])
+    main(["new", "--key", "CORE", "--title", "Second", "--requires", "CORE-1"])
+    capsys.readouterr()
+
+    assert main(["set", "CORE-2", "--requires", sentinel]) == EXIT_OK
+
+    path: Path = inRepo / "docs" / "tickets" / "todo" / "CORE-2_second.md"
+
+    assert "requires: []" in path.read_text(encoding="utf-8")
+
+
+def testSetRejectsTheSentinelMixedWithIds(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Clearing the list and naming a dependency are contradictory, so the pair is refused rather than resolved in one direction and the ticket left unwritten.
+    """
+
+    main(["new", "--key", "CORE", "--title", "First"])
+    main(["new", "--key", "CORE", "--title", "Second", "--requires", "CORE-1"])
+    capsys.readouterr()
+
+    assert main(["set", "CORE-2", "--requires", "CORE-1,none"]) == EXIT_USAGE
+    assert "cannot be combined" in capsys.readouterr().err
+
+    path: Path = inRepo / "docs" / "tickets" / "todo" / "CORE-2_second.md"
+
+    assert "requires: [CORE-1]" in path.read_text(encoding="utf-8")
 
 
 def testStatusMovesTheFile(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -439,11 +476,23 @@ def testCommandsWorkFromASubdirectory(inRepo: Path, capsys: pytest.CaptureFixtur
         ("CORE-9,GEN-3", ["CORE-9", "GEN-3"]),
         (" CORE-9 , GEN-3 ", ["CORE-9", "GEN-3"]),
         ("CORE-9,,GEN-3", ["CORE-9", "GEN-3"]),
+        ("none", []),
+        ("NONE", []),
+        (" None ", []),
     ],
 )
 def testIdListParsing(value, expected) -> None:
     """
-    A comma-separated list tolerates spacing and empty entries, and an empty string clears rather than meaning absent.
+    A comma-separated list tolerates spacing and empty entries, and both an empty string and the sentinel clear rather than meaning absent.
     """
 
     assert parseIdList(value) == expected
+
+
+def testIdListParsingRejectsTheSentinelMixedWithIds() -> None:
+    """
+    The sentinel clears the whole list, so it can never travel alongside an id it would discard.
+    """
+
+    with pytest.raises(InvalidIdError):
+        parseIdList("CORE-9,none")
