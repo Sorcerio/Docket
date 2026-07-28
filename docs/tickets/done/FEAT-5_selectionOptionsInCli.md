@@ -1,7 +1,7 @@
 ---
 id: FEAT-5
 title: Selection Options in CLI
-status: todo
+status: done
 priority: 2
 requires: [BUG-1]
 ---
