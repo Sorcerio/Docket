@@ -11,6 +11,8 @@ wheels/
 
 # Systems
 .DS_Store
-.claude/
+.claude/settings.local.json
+.claude/commands/
+.claude/skills/commit-message/
 graph.mmd
 scripts/*.ps1
