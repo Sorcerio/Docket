@@ -8,11 +8,10 @@
 # See docs/demo/ttyd.cmd for the details.
 #   $env:PATH = "$PWD\docs\demo;C:\Program Files\Git\bin;$env:PATH"
 #
-# The recording creates FEAT-3, leaves it behind, and clears it again on the next run.
-# Re-rendering therefore needs no manual reset.
+# The demo runs under its own DOCK key, registered before capture and removed after.
+# That fixes the ids at DOCK-1 through DOCK-3 however many real tickets exist, and no real ticket is ever touched.
 #
-# That cleanup deletes any ticket whose id is FEAT-3.
-# Renumber this tape if FEAT-3 ever becomes a real ticket in this repository.
+# Setup and teardown are both idempotent, so a render that fails partway leaves nothing behind.
 
 Output docs/demo/docket.gif
 
@@ -21,7 +20,7 @@ Require git
 
 Set Shell bash
 
-# Wide enough for the wrapped ticket body, and roughly 28 rows tall so `docket show` never scrolls.
+# Wide enough for the wrapped ticket body, and roughly 28 rows tall so no beat scrolls.
 # Wait+Screen matches only the visible viewport, so anything scrolled away is unmatchable.
 Set FontSize 20
 Set LineHeight 1.5
@@ -33,6 +32,7 @@ Set Margin 15
 Set MarginFill "#0f19f8"
 Set BorderRadius 10
 Set Theme "Dark Pastel"
+Set WindowBar Colorful
 
 # Nothing in a terminal moves fast enough to need more than 30fps.
 # A still cursor keeps idle frames byte identical, so the long pauses cost almost nothing in the GIF.
@@ -51,9 +51,21 @@ Enter
 Type "set +H"
 Enter
 
-# Drop the ticket a previous recording left behind, so this run allocates FEAT-3 again rather than FEAT-4.
-# The glob covers a retitled file, and both directories cover a run that reached a done status.
-Type `rm -f docs/tickets/todo/FEAT-3_*.md docs/tickets/done/FEAT-3_*.md`
+# Clear anything a failed render left behind, before registering the key again.
+# Tickets go first, because `key remove` refuses while any ticket still uses the key.
+# Both commands are allowed to fail on a clean store, so their errors are discarded.
+Type `rm -f docs/tickets/todo/DOCK-*.md docs/tickets/done/DOCK-*.md`
+Enter
+Type `docket key remove DOCK > /dev/null 2>&1; true`
+Enter
+
+# Register the demo key and seed the two tickets the recording opens on.
+# Creation order fixes the ids, so the ticket created on camera is always DOCK-3.
+Type `docket key add DOCK "demo tickets" --rationale "Reserved for the README demo recording."`
+Enter
+Type `docket new --key DOCK --title "Render the dependency graph"`
+Enter
+Type `docket new --key DOCK --title "Move a ticket when status changes"`
 Enter
 
 # Clear the setup away before capture begins.
@@ -62,25 +74,26 @@ Enter
 Show
 
 # The store as it stands.
-Type "docket list"
+# Filtering by key holds this to three rows however large the real store grows.
+Type "docket list --key DOCK"
 Enter
-Wait+Screen /FEAT-2/
+Wait+Screen /DOCK-2/
 Sleep 1500ms
 
 # Create a ticket that depends on an existing one.
-Type@25ms `docket new --key FEAT --title "Cache the graph render" --requires FEAT-1 --body "Well do something!"`
+Type@25ms `docket new --key DOCK --title "Cache the graph render" --requires DOCK-1 --body "The graph is recomputed on every call."`
 Enter
-Wait+Screen /Created FEAT-/
+Wait+Screen /Created DOCK-3/
 Sleep 1s
 
-Type "docket list"
+Type "docket list --key DOCK"
 Enter
 Wait+Screen /Cache the graph render/
 Sleep 1500ms
 
 # Move it to wip.
 # Status is the truth and the directory follows it.
-Type "docket status FEAT-3 wip"
+Type "docket status DOCK-3 wip"
 Enter
 Wait+Screen /is now wip/
 Sleep 1200ms
@@ -91,7 +104,7 @@ Enter
 Show
 
 # Half the promise: the ticket is a plain markdown file a human can just read.
-Type@25ms "cat docs/tickets/todo/FEAT-3_cacheTheGraphRender.md"
+Type@25ms "cat docs/tickets/todo/DOCK-3_cacheTheGraphRender.md"
 Enter
 Wait+Screen /requires/
 Sleep 3s
@@ -102,21 +115,22 @@ Enter
 Show
 
 # The other half: the same ticket with both dependency directions resolved.
-Type "docket show FEAT-3"
+Type "docket show DOCK-3"
 Enter
 Wait+Screen /Required by/
 Sleep 3s
 
-# Clear first, so validate's one line of output cannot be pushed off the visible viewport.
 Hide
 Type "clear"
 Enter
 Show
 
-Type "docket validate"
+# The graph is mermaid source on stdout, so it pipes and redirects.
+# The wait matches the final line, which proves the whole graph landed.
+Type "docket graph --key DOCK"
 Enter
-Wait+Screen /No findings/
-Sleep 1500ms
+Wait+Screen /class DOCK_3 wip/
+Sleep 3500ms
 
 # Close on the install line, typed but never run, so the last frame is the invitation rather than a result.
 # The `#` lines are shell comments, which puts the copy on screen without printing anything.
@@ -133,3 +147,10 @@ Enter
 Sleep 1s
 Type@60ms "uv tool install git+https://github.com/Sorcerio/Docket"
 Sleep 3500ms
+
+# Remove the demo tickets and the demo key, leaving the store exactly as it was found.
+Hide
+Type `rm -f docs/tickets/todo/DOCK-*.md docs/tickets/done/DOCK-*.md`
+Enter
+Type "docket key remove DOCK"
+Enter
