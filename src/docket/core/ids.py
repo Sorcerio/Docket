@@ -14,7 +14,7 @@ from docket.core.errors import InvalidIdError, InvalidKeyError
 
 # MARK: Constants
 
-# A key is uppercase alphanumeric and must start with a letter, so it can never collide with the lowercase `proposed` sub-table in configuration.
+# A key is uppercase alphanumeric and must start with a letter.
 KEY_PATTERN: re.Pattern[str] = re.compile(r"^[A-Z][A-Z0-9]*$")
 
 # A ticket id is a key, a hyphen, and a positive integer with no leading zeros.

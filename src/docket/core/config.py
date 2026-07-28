@@ -1,19 +1,17 @@
 """
 Docket Config
 
-Reading and writing `.docket.toml`, including the key registry and its proposal flow.
+Reading and writing `.docket.toml`, including the key registry.
 """
 
 # MARK: Imports
 
-import datetime
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
 import tomlkit
 from tomlkit import TOMLDocument
-from tomlkit.items import Table
+from tomlkit.items import Comment, Table
 
 from docket.core.errors import ConfigError, ConfigNotFoundError, InvalidKeyError, UnknownKeyError
 from docket.core.fields import readInt, readString
@@ -24,9 +22,8 @@ from docket.core.ids import requireValidKey
 # The filename looked for when walking up from a starting directory.
 CONFIG_FILENAME: str = ".docket.toml"
 
-# The table holding registered keys, and the sub-table inside it holding proposed ones.
+# The table holding registered keys.
 KEYS_TABLE: str = "keys"
-PROPOSED_TABLE: str = "proposed"
 
 # Field defaults, applied when a configuration omits an optional field.
 DEFAULT_ROOT: str = "docs/tickets"
@@ -36,21 +33,6 @@ DEFAULT_PRIORITY: int = 2
 DEFAULT_MAX_PRIORITY: int = 4
 
 # MARK: Classes
-
-
-@dataclass(frozen=True)
-class ProposedKey:
-    """
-    A key an agent proposed through `propose_key`, awaiting human approval.
-    """
-
-    # MARK: Properties
-
-    key: str
-    description: str
-    rationale: str
-    by: str
-    at: str
 
 
 class Config:
@@ -124,29 +106,11 @@ class Config:
     @property
     def registeredKeys(self) -> dict[str, str]:
         """
-        Approved keys mapped to their descriptions.
+        Registered keys mapped to their descriptions.
         """
 
-        # Skip the nested `proposed` sub-table, which is safe to identify by name because a valid key is always uppercase.
-        return {name: str(value) for name, value in self.__keysTable().items() if name != PROPOSED_TABLE}
-
-    @property
-    def proposedKeys(self) -> dict[str, ProposedKey]:
-        """
-        Keys awaiting approval, mapped to their proposal records.
-        """
-
-        proposed: dict[str, ProposedKey] = {}
-        for name, value in self.__proposedTable().items():
-            proposed[name] = ProposedKey(
-                key=name,
-                description=str(value.get("description", "")),
-                rationale=str(value.get("rationale", "")),
-                by=str(value.get("by", "")),
-                at=str(value.get("at", "")),
-            )
-
-        return proposed
+        # Skip any nested sub-table, so a configuration left over from an older layout is ignored rather than read as a key.
+        return {name: str(value) for name, value in self.__keysTable().items() if not isinstance(value, dict)}
 
     # MARK: Private Functions
 
@@ -166,22 +130,50 @@ class Config:
 
         return table
 
-    def __proposedTable(self) -> Table:
+    def __dropFromKeysTable(self, key: str) -> None:
         """
-        Return the `[keys.proposed]` sub-table, creating it in the document when absent.
+        Remove a key from `[keys]` along with the rationale comment sitting immediately above it, so the reasoning does not outlive what it explained.
 
-        Returns the sub-table.
+        A comment a human wrote elsewhere in the table is untouched, since only the run directly above the key is considered part of it.
+        The table is rebuilt rather than edited in place, because deleting a comment line from the document's body directly would leave `tomlkit`'s internal index pointing at the wrong entries.
+
+        key: The key to drop.
         """
 
-        keys: Table = self.__keysTable()
-        if PROPOSED_TABLE not in keys:
-            keys[PROPOSED_TABLE] = tomlkit.table()
+        body: list[Any] = self.__keysTable().value.body
 
-        table: Any = keys[PROPOSED_TABLE]
-        if not isinstance(table, Table):
-            raise ConfigError(f"Section '[{KEYS_TABLE}.{PROPOSED_TABLE}]' in {self.path} must be a table.")
+        # Find the key's own entry, which is the anchor the comment run is measured back from.
+        index: int = -1
+        for position, (name, _) in enumerate(body):
+            if name is not None and name.key == key:
+                index = position
+                break
 
-        return table
+        if index < 0:
+            return
+
+        # Walk backwards over the comment lines directly above it, stopping at the first entry that is anything else.
+        start: int = index
+        while start > 0:
+            name, item = body[start - 1]
+            if name is not None or not isinstance(item, Comment):
+                break
+
+            start -= 1
+
+        # Copy everything else across in order, so the surviving keys keep their positions and their own comments.
+        rebuilt: Table = tomlkit.table()
+        for position, (name, item) in enumerate(body):
+            if start <= position <= index:
+                continue
+
+            if name is None:
+                rebuilt.add(item)
+                continue
+
+            rebuilt.add(name, item)
+
+        self.document[KEYS_TABLE] = rebuilt
 
     # MARK: Functions
 
@@ -196,33 +188,11 @@ class Config:
 
         return key in self.registeredKeys
 
-    def isProposedKey(self, key: str) -> bool:
-        """
-        Report whether a key is awaiting approval.
-
-        key: The key to test.
-
-        Returns `True` when the key is proposed.
-        """
-
-        return key in self.proposedKeys
-
-    def isKnownKey(self, key: str) -> bool:
-        """
-        Report whether a key may be used on a ticket, meaning it is registered or proposed.
-
-        key: The key to test.
-
-        Returns `True` when tickets may use the key.
-        """
-
-        return self.isRegisteredKey(key) or self.isProposedKey(key)
-
     def requireKnownKey(self, key: str) -> str:
         """
         Return the key unchanged, raising when it is not usable on a ticket.
 
-        The message points at `propose_key`, since that is the recovery path an agent has.
+        The message points at `add_key`, since that is the recovery path an agent has.
 
         key: The key to check.
 
@@ -231,80 +201,60 @@ class Config:
 
         requireValidKey(key)
 
-        if not self.isKnownKey(key):
-            known: str = ", ".join(sorted(self.registeredKeys) + sorted(self.proposedKeys)) or "none"
-            raise UnknownKeyError(f"Key '{key}' is neither registered nor proposed. Known keys: {known}. Call propose_key to add a new one.")
+        if not self.isRegisteredKey(key):
+            known: str = ", ".join(sorted(self.registeredKeys)) or "none"
+            raise UnknownKeyError(f"Key '{key}' is not registered. Known keys: {known}. Ask the user whether to add a new one, then call add_key.")
 
         return key
 
-    def proposeKey(self, key: str, description: str, rationale: str, by: str = "agent", at: Optional[str] = None) -> ProposedKey:
+    def addKey(self, key: str, description: str, rationale: Optional[str] = None) -> str:
         """
-        Add a key to the proposed section so tickets may use it immediately.
+        Register a key so tickets may be created under it.
 
-        key: The key to propose.
-        description: What the key groups, shown alongside registered keys.
-        rationale: Why the key is needed, which is what a human reads when deciding to approve.
-        by: Who proposed it.
-        at: The ISO date of the proposal, defaulting to today.
+        key: The key to register.
+        description: What the key groups, shown alongside the other keys.
+        rationale: Why the key was added, written as a comment above it so the reasoning survives in the file.
 
-        Returns the recorded proposal.
+        Returns the same key.
         """
 
         requireValidKey(key)
 
-        # A key that already exists on either side is not a proposal, it is a mistake worth naming.
+        # A key that already exists is not an addition, it is a mistake worth naming.
         if self.isRegisteredKey(key):
             raise InvalidKeyError(f"Key '{key}' is already registered.")
-        if self.isProposedKey(key):
-            raise InvalidKeyError(f"Key '{key}' is already proposed.")
 
-        # Record the proposal as an inline table so it reads as one line in the file.
-        entry: Any = tomlkit.inline_table()
-        entry["description"] = description
-        entry["rationale"] = rationale
-        entry["by"] = by
-        entry["at"] = at if at is not None else datetime.date.today().isoformat()
+        table: Table = self.__keysTable()
 
-        self.__proposedTable()[key] = entry
+        # Write the rationale first, so it lands on the line above the key rather than beside it.
+        if rationale:
+            table.add(tomlkit.comment(rationale))
+
+        table[key] = description
         self.save()
 
-        return self.proposedKeys[key]
+        return key
 
-    def approveKey(self, key: str) -> None:
+    def removeKey(self, key: str, usedBy: Optional[list[str]] = None) -> None:
         """
-        Promote a proposed key into the registered set, carrying its description across.
+        Remove a registered key.
 
-        key: The key to approve.
-        """
+        Removing a key that tickets already carry would strand those tickets with an unknown key, so the caller passes the ids it found and this refuses loudly.
 
-        if not self.isProposedKey(key):
-            raise UnknownKeyError(f"Key '{key}' is not proposed, so there is nothing to approve.")
-
-        # Move the description up and drop the proposal record, since the rationale has served its purpose.
-        description: str = self.proposedKeys[key].description
-        del self.__proposedTable()[key]
-        self.__keysTable()[key] = description
-
-        self.save()
-
-    def rejectKey(self, key: str, usedBy: Optional[list[str]] = None) -> None:
-        """
-        Remove a proposed key.
-
-        Rejecting a key that tickets already carry would strand those tickets with an unknown key, so the caller passes the ids it found and this refuses loudly.
-
-        key: The key to reject.
+        key: The key to remove.
         usedBy: Ids of tickets currently carrying the key, if any.
         """
 
-        if not self.isProposedKey(key):
-            raise UnknownKeyError(f"Key '{key}' is not proposed, so there is nothing to reject.")
+        if not self.isRegisteredKey(key):
+            raise UnknownKeyError(f"Key '{key}' is not registered, so there is nothing to remove.")
 
         # Refuse while tickets depend on the key, and name them so the user can act.
         if usedBy:
-            raise InvalidKeyError(f"Key '{key}' cannot be rejected because {len(usedBy)} ticket(s) use it: {', '.join(sorted(usedBy))}.")
+            raise InvalidKeyError(f"Key '{key}' cannot be removed because {len(usedBy)} ticket(s) use it: {', '.join(sorted(usedBy))}.")
 
-        del self.__proposedTable()[key]
+        # Take the rationale comment with it, since a comment explaining a key that no longer exists only misleads.
+        self.__dropFromKeysTable(key)
+
         self.save()
 
     def save(self) -> None:

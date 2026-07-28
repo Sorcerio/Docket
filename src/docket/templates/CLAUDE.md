@@ -60,7 +60,7 @@ Filenames are frozen at creation. Retitling a ticket deliberately does not renam
 | Create a ticket | `create_ticket` |
 | See the dependency graph | `graph` |
 | See valid keys | `list_keys` |
-| Add a new key | `propose_key` |
+| Add a new key | `add_key`, after asking the user |
 | Check the set is sound | `validate` |
 
 ## Dependencies point one way
@@ -73,11 +73,15 @@ The reverse direction is derived, not stored. `read_ticket` returns both, so to 
 
 A ticket's key is the part before the hyphen. It groups related work.
 
-Keys must be registered before use. `create_ticket` refuses an unknown one, which is what stops a typo silently spawning an orphan group.
+Keys must be registered before use. `create_ticket` refuses an unregistered one, which is what stops a typo silently spawning an orphan group.
 
 Call `list_keys` before creating a ticket rather than guessing.
 
-When no existing key fits, call `propose_key` with a description and a rationale. The key becomes usable immediately, so a batch in progress is never stranded. It stays a warning in `validate` until a human approves it.
+**When no existing key fits, ask the user before adding one.** Use `AskUserQuestion`. Name the key you have in mind, say what it would group, and say why the existing keys do not cover the work. Offer the closest existing key as an alternative option, because most of the time that is the right answer.
+
+Only once the user has agreed, call `add_key` with the key, a description, and the rationale they just gave you. Never call it on your own judgement. How this repository is carved up is the user's decision, and a key added without asking is a structural change nobody signed off on.
+
+If you are mid-batch and the user is not there to answer, use the closest existing key and say so in the ticket body. Do not stall the batch, and do not invent a key.
 
 ## Write tickets for a reader who was not there
 

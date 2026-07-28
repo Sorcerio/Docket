@@ -213,14 +213,6 @@ def testCreateContinuesNumberingFromExistingTickets(store: Store, config: Config
     assert store.create(key="CORE", title="Next").ticket.id == "CORE-8"
 
 
-def testCreateUnderAProposedKeyIsAllowed(store: Store) -> None:
-    """
-    A proposed key is usable immediately, so a batch begun after `propose_key` completes.
-    """
-
-    assert store.create(key="META", title="Campaign layer").ticket.id == "META-1"
-
-
 def testCreateUnderAnUnknownKeyFails(store: Store) -> None:
     """
     An unregistered key is refused so a typo cannot spawn an orphan group.

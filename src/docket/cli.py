@@ -123,7 +123,7 @@ def buildParser() -> argparse.ArgumentParser:
 
     # Creating a ticket, which allocates the id and freezes the filename.
     newParser: argparse.ArgumentParser = commands.add_parser("new", help="Create a ticket.", formatter_class=RichHelpFormatter)
-    newParser.add_argument("--key", required=True, help="The key to mint under. Must be registered or proposed.")
+    newParser.add_argument("--key", required=True, help="The key to mint under. Must be registered.")
     newParser.add_argument("--title", required=True, help="The ticket title. The filename slug derives from this once, here.")
     newParser.add_argument("--requires", help="Comma-separated ids this ticket depends on.")
     newParser.add_argument("--priority", type=int, help="Priority, 0 most urgent. Defaults to the configured defaultPriority.")
@@ -156,14 +156,15 @@ def buildParser() -> argparse.ArgumentParser:
     keyParser: argparse.ArgumentParser = commands.add_parser("key", help="Inspect and manage the key registry.", formatter_class=RichHelpFormatter)
     keyCommands = keyParser.add_subparsers(dest="keyCommand", metavar="SUBCOMMAND")
 
-    keyListParser: argparse.ArgumentParser = keyCommands.add_parser("list", help="List registered and proposed keys.", formatter_class=RichHelpFormatter)
-    keyListParser.add_argument("--proposed", action="store_true", help="List only keys awaiting approval.")
+    keyCommands.add_parser("list", help="List the registered keys.", formatter_class=RichHelpFormatter)
 
-    keyApproveParser: argparse.ArgumentParser = keyCommands.add_parser("approve", help="Promote a proposed key.", formatter_class=RichHelpFormatter)
-    keyApproveParser.add_argument("key", help="The key to approve.")
+    keyAddParser: argparse.ArgumentParser = keyCommands.add_parser("add", help="Register a new key.", formatter_class=RichHelpFormatter)
+    keyAddParser.add_argument("key", help="The key to add.")
+    keyAddParser.add_argument("description", help="What the key groups.")
+    keyAddParser.add_argument("--rationale", help="Why the key was added, written as a comment above it.")
 
-    keyRejectParser: argparse.ArgumentParser = keyCommands.add_parser("reject", help="Remove a proposed key.", formatter_class=RichHelpFormatter)
-    keyRejectParser.add_argument("key", help="The key to reject.")
+    keyRemoveParser: argparse.ArgumentParser = keyCommands.add_parser("remove", help="Remove a key no ticket uses.", formatter_class=RichHelpFormatter)
+    keyRemoveParser.add_argument("key", help="The key to remove.")
 
     commands.add_parser("validate", help="Run every integrity rule.", formatter_class=RichHelpFormatter)
 
@@ -421,34 +422,29 @@ def commandKey(args: argparse.Namespace, store: Store, output: Output) -> int:
 
     config: Config = store.config
 
-    if args.keyCommand == "approve":
-        config.approveKey(args.key)
-        output.print(f"Approved [bold]{args.key}[/bold]")
+    if args.keyCommand == "add":
+        config.addKey(args.key, args.description, rationale=args.rationale)
+        output.print(f"Added [bold]{args.key}[/bold]")
 
         return EXIT_OK
 
-    if args.keyCommand == "reject":
+    if args.keyCommand == "remove":
         # Hand the store's view of usage in, so a key with tickets behind it fails loudly and names them.
-        config.rejectKey(args.key, usedBy=store.usedKeys().get(args.key))
-        output.print(f"Rejected [bold]{args.key}[/bold]")
+        config.removeKey(args.key, usedBy=store.usedKeys().get(args.key))
+        output.print(f"Removed [bold]{args.key}[/bold]")
 
         return EXIT_OK
 
     if args.keyCommand != "list":
-        output.error("Expected one of: list, approve, reject.")
+        output.error("Expected one of: list, add, remove.")
         return EXIT_USAGE
 
     table: Table = Table(box=None, pad_edge=False)
     table.add_column("KEY", style="bold")
-    table.add_column("STATE")
     table.add_column("DESCRIPTION")
 
-    if not args.proposed:
-        for key, description in sorted(config.registeredKeys.items()):
-            table.add_row(key, Text("registered", style="green"), description)
-
-    for key, proposed in sorted(config.proposedKeys.items()):
-        table.add_row(key, Text("proposed", style="yellow"), f"{proposed.description}  [dim]({proposed.rationale})[/dim]")
+    for key, description in sorted(config.registeredKeys.items()):
+        table.add_row(key, description)
 
     if not table.rows:
         output.print("[dim]No keys.[/dim]")

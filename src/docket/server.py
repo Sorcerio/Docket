@@ -43,7 +43,7 @@ So: use `update_ticket` for title, priority, and dependencies, and `set_status` 
 
 Dependencies are stored in one direction only. A ticket declares `requires`, and never declares what it blocks. `read_ticket` returns both directions, deriving the reverse side for you.
 
-Keys are closed. Call `list_keys` before `create_ticket`, and `propose_key` when no existing key fits.
+Keys are closed. Call `list_keys` before `create_ticket`. When no existing key fits, ask the user with `AskUserQuestion` whether to add one, and call `add_key` only once they agree.
 """
 
 # MARK: Server
@@ -106,7 +106,7 @@ def createTicket(
     """
     Create a ticket, allocating its id and writing the file.
 
-    The key must already be registered or proposed. Call `list_keys` first rather than guessing, and call `propose_key` when nothing fits. An unknown key is refused.
+    The key must already be registered. Call `list_keys` first rather than guessing. When nothing fits, ask the user with `AskUserQuestion` and call `add_key` once they agree. An unregistered key is refused.
 
     Write the body so a reader with no other context can act on it. Include the architecture discussed, the assumptions made, and the questions already answered, stated plainly in the ticket itself.
 
@@ -191,35 +191,31 @@ def listKeys() -> str:
     """
     List the keys tickets may be created under.
 
-    Registered keys are approved. Proposed keys are awaiting human approval but are usable immediately. A key not listed here will be refused by `create_ticket`.
+    A key not listed here will be refused by `create_ticket`.
     """
 
-    config: Config = _config()
+    registered: list[dict[str, str]] = [{"key": key, "description": description} for key, description in sorted(_config().registeredKeys.items())]
 
-    registered: list[dict[str, str]] = [{"key": key, "description": description} for key, description in sorted(config.registeredKeys.items())]
-    proposed: list[dict[str, str]] = [
-        {"key": key, "description": entry.description, "rationale": entry.rationale, "by": entry.by, "at": entry.at}
-        for key, entry in sorted(config.proposedKeys.items())
-    ]
-
-    return _json({"registered": registered, "proposed": proposed})
+    return _json({"registered": registered})
 
 
-@mcp.tool(name="propose_key")
-def proposeKey(key: str, description: str, rationale: str) -> str:
+@mcp.tool(name="add_key")
+def addKey(key: str, description: str, rationale: str) -> str:
     """
-    Propose a new key, so tickets can be created under it immediately.
+    Register a new key, so tickets can be created under it.
 
-    Use this when no existing key fits the work, not when you cannot remember which key to use. Call `list_keys` first. The proposal is written into the repository's configuration where it shows up in the git diff, and it stays a warning in `validate` until a human approves it.
+    Adding a key changes how this repository is organized, which is the user's call and not yours. Before calling this, ask the user with `AskUserQuestion` whether they want the new key, naming the key you propose and why the existing ones do not fit. Offer using an existing key as an option. Call this only once they have agreed, and never as a reflex because you cannot remember which key to use. Call `list_keys` first.
+
+    The key is written into the repository's configuration, where it shows up in the git diff.
 
     key: The new key. Uppercase alphanumeric, starting with a letter, for example META.
-    description: What this key groups, shown alongside the registered keys.
-    rationale: Why a new key is needed. This is what a human reads when deciding whether to approve it.
+    description: What this key groups, shown alongside the other keys.
+    rationale: Why a new key is needed. This is written as a comment above the key, so a later reader sees the reasoning.
     """
 
-    proposed = _config().proposeKey(key=key, description=description, rationale=rationale)
+    _config().addKey(key=key, description=description, rationale=rationale)
 
-    return _json({"key": proposed.key, "description": proposed.description, "rationale": proposed.rationale, "at": proposed.at, "approved": False})
+    return _json({"key": key, "description": description, "rationale": rationale})
 
 
 @mcp.tool(name="validate")

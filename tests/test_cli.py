@@ -72,14 +72,14 @@ def testNewWithADanglingDependencyWarnsOnStderrAndSucceeds(inRepo: Path, capsys:
     assert "CORE-99" not in captured.out
 
 
-def testNewUnderAnUnknownKeyFailsAndPointsAtProposeKey(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def testNewUnderAnUnknownKeyFailsAndPointsAtAddKey(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """
     A core error surfaces as a message on stderr and a usage exit code.
     """
 
     assert main(["new", "--key", "NOPE", "--title", "Orphan"]) == EXIT_USAGE
 
-    assert "propose_key" in capsys.readouterr().err
+    assert "add_key" in capsys.readouterr().err
 
 
 def testShowResolvesBothDependencyDirections(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -317,9 +317,9 @@ def testGraphScopedToAKeyMarksNeighbors(inRepo: Path, capsys: pytest.CaptureFixt
     assert "external" in capsys.readouterr().out
 
 
-def testKeyListShowsBothStates(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def testKeyListShowsTheRegisteredKeys(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """
-    Registered and proposed keys are listed together, distinguished by state.
+    Every key a ticket may use is listed with its description.
     """
 
     assert main(["key", "list"]) == EXIT_OK
@@ -327,72 +327,51 @@ def testKeyListShowsBothStates(inRepo: Path, capsys: pytest.CaptureFixture[str])
     out: str = capsys.readouterr().out
 
     assert "CORE" in out
-    assert "registered" in out
+    assert "tactical-sim core" in out
     assert "META" in out
-    assert "proposed" in out
 
 
-def testKeyListProposedFiltersOutRegistered(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def testKeyAddRegistersTheKeyWithItsRationale(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """
-    The flag narrows the listing to keys awaiting a decision.
-    """
-
-    main(["key", "list", "--proposed"])
-
-    out: str = capsys.readouterr().out
-
-    assert "META" in out
-    assert "registered" not in out
-
-
-def testKeyApprovePromotesTheKey(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """
-    Approval moves the key across and persists immediately.
+    Adding a key persists immediately, with the rationale kept as a comment above it.
     """
 
-    assert main(["key", "approve", "META"]) == EXIT_OK
+    assert main(["key", "add", "SIM", "simulation layer", "--rationale", "the tick loop is its own area"]) == EXIT_OK
 
     config: Config = loadConfig(inRepo / ".docket.toml")
 
-    assert config.registeredKeys["META"] == "campaign and progression"
-    assert not config.isProposedKey("META")
-
-    # The now-empty section header survives, which is what keeps a hand-written comment above it from being dropped.
-    assert "[keys.proposed]" in (inRepo / ".docket.toml").read_text(encoding="utf-8")
+    assert config.registeredKeys["SIM"] == "simulation layer"
+    assert "# the tick loop is its own area" in (inRepo / ".docket.toml").read_text(encoding="utf-8")
 
 
-def testKeyRejectRefusesWhileTicketsUseIt(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def testKeyAddRefusesADuplicate(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """
-    Rejecting a key in use would strand those tickets, so it fails loudly and names them.
+    Re-adding a key would silently rewrite its description, so it fails instead.
+    """
+
+    assert main(["key", "add", "CORE", "duplicate"]) == EXIT_USAGE
+    assert "CORE" in capsys.readouterr().err
+
+
+def testKeyRemoveRefusesWhileTicketsUseIt(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Removing a key in use would strand those tickets, so it fails loudly and names them.
     """
 
     main(["new", "--key", "META", "--title", "Campaign layer"])
     capsys.readouterr()
 
-    assert main(["key", "reject", "META"]) == EXIT_USAGE
+    assert main(["key", "remove", "META"]) == EXIT_USAGE
     assert "META-1" in capsys.readouterr().err
 
 
-def testKeyRejectRemovesAnUnusedKey(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def testKeyRemoveDropsAnUnusedKey(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """
-    With nothing standing in the way the proposal is dropped.
+    With nothing standing in the way the key and its comment both go.
     """
 
-    assert main(["key", "reject", "META"]) == EXIT_OK
+    assert main(["key", "remove", "META"]) == EXIT_OK
     assert "META" not in (inRepo / ".docket.toml").read_text(encoding="utf-8")
-
-
-def testValidateReportsWarningsButStillSucceeds(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """
-    A pre-commit hook must not fail on a pending proposal, so warnings alone exit zero.
-    """
-
-    assert main(["validate"]) == EXIT_OK
-
-    out: str = capsys.readouterr().out
-
-    assert "warning" in out
-    assert "META" in out
 
 
 def testValidateExitsNonZeroOnErrors(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -409,11 +388,8 @@ def testValidateExitsNonZeroOnErrors(inRepo: Path, capsys: pytest.CaptureFixture
 
 def testValidateOnACleanRepositorySaysNothingIsWrong(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """
-    With the proposed key resolved there is nothing at all to report.
+    A well-formed repository reports nothing at all.
     """
-
-    main(["key", "reject", "META"])
-    capsys.readouterr()
 
     assert main(["validate"]) == EXIT_OK
     assert "No findings." in capsys.readouterr().out

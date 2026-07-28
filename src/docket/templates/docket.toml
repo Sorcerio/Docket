@@ -13,9 +13,6 @@ defaultPriority = 2
 maxPriority = 4
 
 # Keys group related work. A ticket id is <KEY>-<NUM>.
-# Add a key here with a short description of what it covers. A key must exist before tickets can use it.
+# Add a key here with a short description of what it covers, or run `docket key add <KEY> "<DESCRIPTION>"`. A key must exist before tickets can use it.
+# An agent adds one through add_key, which it is told to do only after asking you first.
 [keys]
-
-# Keys an agent proposed through propose_key, usable immediately but awaiting your decision.
-# Promote one with `docket key approve <KEY>`, or drop it with `docket key reject <KEY>`.
-[keys.proposed]

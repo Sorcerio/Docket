@@ -73,7 +73,7 @@ def testEveryDocumentedToolIsRegistered() -> None:
     """
 
     assert sorted(toolNames()) == sorted(
-        ["list_tickets", "read_ticket", "create_ticket", "update_ticket", "set_status", "graph", "list_keys", "propose_key", "validate"]
+        ["list_tickets", "read_ticket", "create_ticket", "update_ticket", "set_status", "graph", "list_keys", "add_key", "validate"]
     )
 
 
@@ -110,7 +110,10 @@ def testCreateTicketDescriptionDirectsTheAgentToListKeys() -> None:
     createTicket = [tool for tool in asyncio.run(server.mcp.list_tools()) if tool.name == "create_ticket"][0]
 
     assert "list_keys" in createTicket.description
-    assert "propose_key" in createTicket.description
+    assert "add_key" in createTicket.description
+
+    # The user decides whether a new key exists, so the tool that asks them is named too.
+    assert "AskUserQuestion" in createTicket.description
 
 
 def testServerInstructionsCoverTheLoadBearingRules() -> None:
@@ -123,6 +126,7 @@ def testServerInstructionsCoverTheLoadBearingRules() -> None:
     assert "never move a file" in instructions.lower()
     assert "requires" in instructions
     assert "list_keys" in instructions
+    assert "AskUserQuestion" in instructions
 
     # The body is editable by hand, and saying otherwise would forbid the only way to revise prose.
     assert "edit directly and freely" in instructions
@@ -160,15 +164,7 @@ def testCreateTicketUnderAnUnknownKeyErrors(inRepo: Path) -> None:
     with pytest.raises(Exception) as excInfo:
         callTool("create_ticket", {"key": "NOPE", "title": "Orphan"})
 
-    assert "propose_key" in str(excInfo.value)
-
-
-def testCreateTicketUnderAProposedKeyWorks(inRepo: Path) -> None:
-    """
-    A proposed key is usable immediately, which is what stops a batch stranding mid-flight.
-    """
-
-    assert callTool("create_ticket", {"key": "META", "title": "Campaign layer"})["id"] == "META-1"
+    assert "add_key" in str(excInfo.value)
 
 
 def testListTicketsNeverReturnsBodies(inRepo: Path) -> None:
@@ -346,27 +342,35 @@ def testGraphScopesToAKeyAndMarksNeighbors(inRepo: Path) -> None:
     assert "external" in payload["mermaid"]
 
 
-def testListKeysSeparatesRegisteredFromProposed(inRepo: Path) -> None:
+def testListKeysReturnsEveryRegisteredKey(inRepo: Path) -> None:
     """
-    An agent needs to know which keys are approved and which are still pending, along with the rationale behind a proposal.
+    An agent needs the full set of keys it may create under, with the descriptions that say which one fits.
     """
 
     payload = callTool("list_keys")
 
-    assert [entry["key"] for entry in payload["registered"]] == ["CORE", "GEN", "HEAD"]
-    assert payload["proposed"][0]["key"] == "META"
-    assert payload["proposed"][0]["rationale"] == "the strategic layer is a distinct area"
+    assert [entry["key"] for entry in payload["registered"]] == ["CORE", "GEN", "HEAD", "META"]
+    assert payload["registered"][0]["description"] == "tactical-sim core"
 
 
-def testProposeKeyWritesToConfiguration(inRepo: Path) -> None:
+def testAddKeyMustTellTheAgentToAskFirst(inRepo: Path) -> None:
     """
-    A proposal lands in the configuration file, where it shows up in the git diff for a human to see.
+    Adding a key is the user's decision, so the description is what stops an agent doing it unprompted.
     """
 
-    payload = callTool("propose_key", {"key": "SIM", "description": "simulation layer", "rationale": "the tick loop is its own area"})
+    addKey = [tool for tool in asyncio.run(server.mcp.list_tools()) if tool.name == "add_key"][0]
+
+    assert "AskUserQuestion" in addKey.description
+
+
+def testAddKeyWritesToConfiguration(inRepo: Path) -> None:
+    """
+    A new key lands in the configuration file, where it shows up in the git diff for a human to see.
+    """
+
+    payload = callTool("add_key", {"key": "SIM", "description": "simulation layer", "rationale": "the tick loop is its own area"})
 
     assert payload["key"] == "SIM"
-    assert payload["approved"] is False
 
     text: str = (inRepo / ".docket.toml").read_text(encoding="utf-8")
 
@@ -374,23 +378,23 @@ def testProposeKeyWritesToConfiguration(inRepo: Path) -> None:
     assert "the tick loop is its own area" in text
 
 
-def testProposeKeyThenCreateUnderItSucceeds(inRepo: Path) -> None:
+def testAddKeyThenCreateUnderItSucceeds(inRepo: Path) -> None:
     """
-    This is the whole point of the soft gate, so the round trip is asserted directly.
+    A key is usable the moment it is added, so the round trip is asserted directly.
     """
 
-    callTool("propose_key", {"key": "SIM", "description": "simulation layer", "rationale": "needed"})
+    callTool("add_key", {"key": "SIM", "description": "simulation layer", "rationale": "needed"})
 
     assert callTool("create_ticket", {"key": "SIM", "title": "Tick loop"})["id"] == "SIM-1"
 
 
-def testProposeKeyRejectsAMalformedKey(inRepo: Path) -> None:
+def testAddKeyRejectsAMalformedKey(inRepo: Path) -> None:
     """
-    The key format is enforced, so a lowercase or hyphenated proposal is refused.
+    The key format is enforced, so a lowercase or hyphenated key is refused.
     """
 
     with pytest.raises(Exception):
-        callTool("propose_key", {"key": "sim", "description": "d", "rationale": "r"})
+        callTool("add_key", {"key": "sim", "description": "d", "rationale": "r"})
 
 
 def testValidateReturnsStructuredFindings(inRepo: Path) -> None:
@@ -408,23 +412,24 @@ def testValidateReturnsStructuredFindings(inRepo: Path) -> None:
     assert payload["findings"][0]["id"] == "CORE-1"
 
 
-def testValidateIsValidWithWarningsAlone(inRepo: Path) -> None:
+def testValidateOnAFreshRepositoryIsClean(inRepo: Path) -> None:
     """
-    A pending proposal informs without invalidating, matching the CLI's exit-code behavior.
+    A repository with no tickets has nothing to report, in either severity.
     """
 
     payload = callTool("validate")
 
     assert payload["valid"] is True
-    assert payload["warningCount"] == 2
+    assert payload["errorCount"] == 0
+    assert payload["warningCount"] == 0
 
 
 def testTheBatchWorkflowRoundTrips(inRepo: Path) -> None:
     """
-    The intended agent flow end to end: propose a key, write a batch out of order, then validate it clean.
+    The intended agent flow end to end: add a key the user agreed to, write a batch out of order, then validate it clean.
     """
 
-    callTool("propose_key", {"key": "SIM", "description": "simulation layer", "rationale": "needed"})
+    callTool("add_key", {"key": "SIM", "description": "simulation layer", "rationale": "needed"})
 
     # Written before its dependency exists, which warns rather than failing.
     first = callTool("create_ticket", {"key": "SIM", "title": "Tick loop", "requires": ["SIM-2"]})

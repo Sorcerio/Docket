@@ -33,8 +33,6 @@ RULE_FILENAME_MISMATCH: str = "filenameMismatch"
 RULE_STATUS_DIRECTORY: str = "statusDirectoryMismatch"
 RULE_PRIORITY_RANGE: str = "priorityOutOfRange"
 RULE_UNKNOWN_STATUS: str = "unknownStatus"
-RULE_KEY_UNAPPROVED: str = "keyAwaitingApproval"
-RULE_KEY_UNUSED: str = "proposedKeyUnused"
 
 # MARK: Classes
 
@@ -159,7 +157,6 @@ def validate(store: Store, ticketSet: Optional[TicketSet] = None) -> ValidationR
         findings.extend(_checkStatus(ticket))
 
     findings.extend(_checkCycles(graph))
-    findings.extend(_checkProposedKeys(config, loaded))
 
     return ValidationReport(findings=findings)
 
@@ -227,7 +224,7 @@ def _checkDependencies(ticket: Ticket, ticketSet: TicketSet) -> list[Finding]:
 
 def _checkKey(ticket: Ticket, config: Config) -> list[Finding]:
     """
-    Report a ticket whose key is neither registered nor proposed.
+    Report a ticket whose key is not registered.
 
     ticket: The ticket to check.
     config: The configuration holding the key registry.
@@ -235,14 +232,14 @@ def _checkKey(ticket: Ticket, config: Config) -> list[Finding]:
     Returns the findings.
     """
 
-    if config.isKnownKey(ticket.key):
+    if config.isRegisteredKey(ticket.key):
         return []
 
     return [
         Finding(
             severity=SEVERITY_ERROR,
             rule=RULE_UNKNOWN_KEY,
-            message=f"Ticket '{ticket.id}' uses key '{ticket.key}', which is neither registered nor proposed.",
+            message=f"Ticket '{ticket.id}' uses key '{ticket.key}', which is not registered.",
             ticketId=ticket.id,
             path=ticket.path,
         )
@@ -377,40 +374,5 @@ def _checkCycles(graph: ResolvedGraph) -> list[Finding]:
             continue
 
         findings.append(Finding(severity=SEVERITY_ERROR, rule=RULE_CYCLE, message=f"Dependency cycle between {', '.join(cycle)}.", ticketId=cycle[0]))
-
-    return findings
-
-
-def _checkProposedKeys(config: Config, ticketSet: TicketSet) -> list[Finding]:
-    """
-    Report proposed keys, which are warnings until a human promotes them.
-
-    config: The configuration holding the registry.
-    ticketSet: The loaded set, used to see which proposed keys are actually in use.
-
-    Returns the findings.
-    """
-
-    usedKeys: set[str] = {ticket.key for ticket in ticketSet.tickets.values()}
-
-    findings: list[Finding] = []
-    for key in sorted(config.proposedKeys):
-        findings.append(
-            Finding(
-                severity=SEVERITY_WARNING,
-                rule=RULE_KEY_UNAPPROVED,
-                message=f"Key '{key}' is proposed and awaiting approval. Run 'docket key approve {key}' or 'docket key reject {key}'.",
-            )
-        )
-
-        # A proposal nothing ever used is probably abandoned, which is worth saying separately.
-        if key not in usedKeys:
-            findings.append(
-                Finding(
-                    severity=SEVERITY_WARNING,
-                    rule=RULE_KEY_UNUSED,
-                    message=f"Key '{key}' is proposed but no ticket uses it.",
-                )
-            )
 
     return findings

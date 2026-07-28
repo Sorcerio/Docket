@@ -55,7 +55,6 @@ def testDeployedConfigurationHasAnEmptyKeyRegistry(tmp_path: Path) -> None:
     config: Config = loadConfig(tmp_path / ".docket.toml")
 
     assert config.registeredKeys == {}
-    assert config.proposedKeys == {}
 
 
 def testDeployedConfigurationCarriesNoStatusesKey(tmp_path: Path) -> None:
@@ -334,9 +333,10 @@ def testTheDeployedInstructionsCoverTheLoadBearingRules(tmp_path: Path) -> None:
     assert "requiredBy" in text
     assert "never declares what it blocks" in text
 
-    # Keys are closed, with both the listing and the proposal tool named.
+    # Keys are closed, with the listing tool, the adding tool, and the requirement to ask the user first all named.
     assert "list_keys" in text
-    assert "propose_key" in text
+    assert "add_key" in text
+    assert "AskUserQuestion" in text
 
     # The instruction carried over from the source repository, which is load-bearing.
     assert "assumptions" in text

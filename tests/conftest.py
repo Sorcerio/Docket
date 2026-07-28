@@ -28,9 +28,8 @@ maxPriority = 4
 CORE = "tactical-sim core"
 GEN = "map generation"
 HEAD = "Godot frontend and seam"
-
-[keys.proposed]
-META = { description = "campaign and progression", rationale = "the strategic layer is a distinct area", by = "agent", at = "2026-07-27" }
+# The strategic layer is a distinct area.
+META = "campaign and progression"
 """
 
 # MARK: Fixtures

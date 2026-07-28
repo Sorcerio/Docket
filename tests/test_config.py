@@ -95,48 +95,34 @@ def testADefaultPriorityAboveTheCeilingIsRejected(tmp_path: Path) -> None:
         loadConfig(configPath)
 
 
-def testRegisteredKeysExcludeTheProposedTable(config: Config) -> None:
+def testRegisteredKeysAreReadWithTheirDescriptions(config: Config) -> None:
     """
-    The nested `proposed` sub-table lives inside `[keys]` and must not be read as a key itself.
+    Every scalar entry under `[keys]` is a key, and the comments between them are not.
     """
 
     assert config.registeredKeys == {
         "CORE": "tactical-sim core",
         "GEN": "map generation",
         "HEAD": "Godot frontend and seam",
+        "META": "campaign and progression",
     }
-    assert "proposed" not in config.registeredKeys
 
 
-def testProposedKeysAreReadWithTheirRationale(config: Config) -> None:
+def testANestedTableUnderKeysIsIgnored(tmp_path: Path) -> None:
     """
-    A proposal carries the description and rationale a human needs to decide on it.
-    """
-
-    proposed = config.proposedKeys["META"]
-
-    assert proposed.key == "META"
-    assert proposed.description == "campaign and progression"
-    assert proposed.rationale == "the strategic layer is a distinct area"
-    assert proposed.by == "agent"
-    assert proposed.at == "2026-07-27"
-
-
-def testKnownKeysCoverBothRegisteredAndProposed(config: Config) -> None:
-    """
-    A ticket may use a proposed key immediately, so both sides count as known.
+    A configuration left over from the older proposal layout still loads, with the stale sub-table read as nothing rather than as a key.
     """
 
-    assert config.isRegisteredKey("CORE")
+    configPath: Path = tmp_path / ".docket.toml"
+    configPath.write_text("[keys]\nCORE = \"core\"\n\n[keys.proposed]\nMETA = { description = \"old\" }\n", encoding="utf-8", newline="\n")
+
+    config: Config = loadConfig(configPath)
+
+    assert config.registeredKeys == {"CORE": "core"}
     assert not config.isRegisteredKey("META")
 
-    assert config.isProposedKey("META")
-    assert config.isKnownKey("META")
 
-    assert not config.isKnownKey("NOPE")
-
-
-def testRequireKnownKeyPointsAtProposeKey(config: Config) -> None:
+def testRequireKnownKeyPointsAtAddKey(config: Config) -> None:
     """
     The error an agent sees names the valid keys and the recovery path.
     """
@@ -146,7 +132,7 @@ def testRequireKnownKeyPointsAtProposeKey(config: Config) -> None:
 
     message: str = str(excInfo.value)
 
-    assert "propose_key" in message
+    assert "add_key" in message
     assert "CORE" in message
 
 
@@ -159,92 +145,93 @@ def testRequireKnownKeyRejectsAMalformedKeyFirst(config: Config) -> None:
         config.requireKnownKey("nope")
 
 
-def testProposeKeyWritesToTheFile(config: Config) -> None:
+def testAddKeyWritesToTheFile(config: Config) -> None:
     """
-    A proposal persists immediately, so a batch can continue against the new key.
+    A new key persists immediately, so a batch can continue against it.
     """
 
-    config.proposeKey("SIM", "simulation layer", "the tick loop is its own area", at="2026-07-27")
+    config.addKey("SIM", "simulation layer")
 
     reloaded: Config = loadConfig(config.path)
 
-    assert reloaded.isProposedKey("SIM")
-    assert reloaded.proposedKeys["SIM"].rationale == "the tick loop is its own area"
-    assert not reloaded.isRegisteredKey("SIM")
+    assert reloaded.isRegisteredKey("SIM")
+    assert reloaded.registeredKeys["SIM"] == "simulation layer"
 
 
-def testProposeKeyDefaultsTheDate(config: Config) -> None:
+def testAddKeyWritesTheRationaleAsACommentAboveIt(config: Config) -> None:
     """
-    Omitting the date records today rather than leaving the field blank.
+    The rationale is reasoning for a human reader, so it lives on the line above the key rather than inside its value.
     """
 
-    proposed = config.proposeKey("SIM", "simulation layer", "needed")
+    config.addKey("SIM", "simulation layer", rationale="the tick loop is its own area")
 
-    assert len(proposed.at) == 10
-    assert proposed.by == "agent"
+    text: str = config.path.read_text(encoding="utf-8")
+
+    assert "# the tick loop is its own area\nSIM = \"simulation layer\"" in text
+
+    # The comment is reasoning around the key, not part of it.
+    assert loadConfig(config.path).registeredKeys["SIM"] == "simulation layer"
 
 
-def testProposingAnExistingKeyFails(config: Config) -> None:
+def testAddingAnExistingKeyFails(config: Config) -> None:
     """
-    Re-proposing a key on either side is a mistake worth naming rather than a silent overwrite.
+    Re-adding a key is a mistake worth naming rather than a silent overwrite of its description.
     """
 
     with pytest.raises(InvalidKeyError):
-        config.proposeKey("CORE", "duplicate", "duplicate")
+        config.addKey("CORE", "duplicate")
+
+
+def testAddingAMalformedKeyFails(config: Config) -> None:
+    """
+    The key form is checked before anything is written, so a typo cannot land in the file.
+    """
 
     with pytest.raises(InvalidKeyError):
-        config.proposeKey("META", "duplicate", "duplicate")
+        config.addKey("sim", "simulation layer")
 
 
-def testApproveKeyMovesItAcross(config: Config) -> None:
+def testRemoveKeyTakesItsRationaleCommentWithIt(config: Config) -> None:
     """
-    Approval carries the description into the registered set and drops the proposal record.
-    """
-
-    config.approveKey("META")
-
-    reloaded: Config = loadConfig(config.path)
-
-    assert reloaded.registeredKeys["META"] == "campaign and progression"
-    assert not reloaded.isProposedKey("META")
-
-
-def testApprovingAnUnproposedKeyFails(config: Config) -> None:
-    """
-    There is nothing to promote for a key that was never proposed.
+    A comment explaining a key that no longer exists only misleads, so the run directly above the key goes too.
     """
 
-    with pytest.raises(UnknownKeyError):
-        config.approveKey("NOPE")
+    config.removeKey("META")
+
+    text: str = config.path.read_text(encoding="utf-8")
+
+    assert "META" not in text
+    assert "The strategic layer is a distinct area" not in text
+
+    # A comment belonging to a different key is left alone.
+    assert "# The engine itself." in text
+    assert loadConfig(config.path).registeredKeys["CORE"] == "tactical-sim core"
 
 
-def testRejectKeyRemovesIt(config: Config) -> None:
+def testRemoveKeyRefusesWhileTicketsUseIt(config: Config) -> None:
     """
-    Rejection drops the proposal entirely.
-    """
-
-    config.rejectKey("META")
-
-    reloaded: Config = loadConfig(config.path)
-
-    assert not reloaded.isKnownKey("META")
-
-
-def testRejectKeyRefusesWhileTicketsUseIt(config: Config) -> None:
-    """
-    Rejecting a key in use would strand those tickets, so it fails and names them.
+    Removing a key in use would strand those tickets, so it fails and names them.
     """
 
     with pytest.raises(InvalidKeyError) as excInfo:
-        config.rejectKey("META", usedBy=["META-2", "META-1"])
+        config.removeKey("META", usedBy=["META-2", "META-1"])
 
     message: str = str(excInfo.value)
 
     assert "META-1" in message
     assert "META-2" in message
 
-    # The proposal survives the refusal.
-    assert loadConfig(config.path).isProposedKey("META")
+    # The key survives the refusal.
+    assert loadConfig(config.path).isRegisteredKey("META")
+
+
+def testRemovingAnUnregisteredKeyFails(config: Config) -> None:
+    """
+    There is nothing to remove for a key that was never registered.
+    """
+
+    with pytest.raises(UnknownKeyError):
+        config.removeKey("NOPE")
 
 
 def testWritingPreservesCommentsAndKeyOrder(config: Config) -> None:
@@ -252,7 +239,7 @@ def testWritingPreservesCommentsAndKeyOrder(config: Config) -> None:
     The file is hand-maintained, so a write must not strip the comments or alphabetize the keys around them.
     """
 
-    config.proposeKey("SIM", "simulation layer", "needed", at="2026-07-27")
+    config.addKey("SIM", "simulation layer")
 
     text: str = config.path.read_text(encoding="utf-8")
 

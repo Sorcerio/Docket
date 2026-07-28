@@ -35,7 +35,7 @@ class InvalidKeyError(DocketError):
 
 class UnknownKeyError(DocketError):
     """
-    Raised when a key is neither registered nor proposed.
+    Raised when a key is not registered.
     """
 
 

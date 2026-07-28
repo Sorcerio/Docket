@@ -304,7 +304,7 @@ class Store:
         """
         Allocate an id and write a new ticket.
 
-        key: The key to mint under, which must be registered or proposed.
+        key: The key to mint under, which must be registered.
         title: The ticket title, which the filename slug derives from once, here.
         body: Prose for the body, placed under a heading built from the title.
         requires: Ids this ticket depends on.
@@ -313,7 +313,7 @@ class Store:
         Returns the written ticket and any warnings.
         """
 
-        # A key must be usable before anything is minted under it, and the error names `propose_key` as the way out.
+        # A key must be registered before anything is minted under it, and the error names `add_key` as the way out.
         requireValidKey(key)
         self.config.requireKnownKey(key)
 

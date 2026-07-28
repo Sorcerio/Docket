@@ -16,8 +16,6 @@ from docket.core.validate import (
     RULE_CYCLE,
     RULE_DUPLICATE_ID,
     RULE_FILENAME_MISMATCH,
-    RULE_KEY_UNAPPROVED,
-    RULE_KEY_UNUSED,
     RULE_MISSING_DEPENDENCY,
     RULE_PRIORITY_RANGE,
     RULE_STATUS_DIRECTORY,
@@ -26,6 +24,7 @@ from docket.core.validate import (
     RULE_UNREADABLE,
     SEVERITY_ERROR,
     SEVERITY_WARNING,
+    Finding,
     ValidationReport,
     validate,
 )
@@ -98,7 +97,7 @@ def rules(report: ValidationReport) -> list[str]:
 
 def testACleanRepositoryHasNoErrors(store: Store, config: Config) -> None:
     """
-    A well-formed set produces no errors, and the proposed key in the fixture is the only noise.
+    A well-formed set produces nothing at all, not merely no errors.
     """
 
     writeRaw(config, "todo", "CORE-1_a.md", makeText("CORE-1"))
@@ -107,8 +106,7 @@ def testACleanRepositoryHasNoErrors(store: Store, config: Config) -> None:
     report: ValidationReport = validate(store)
 
     assert report.isValid
-    assert report.errors == []
-    assert rules(report) == [RULE_KEY_UNAPPROVED, RULE_KEY_UNUSED]
+    assert report.findings == []
 
 
 def testAnEmptyRepositoryIsValid(store: Store) -> None:
@@ -188,20 +186,6 @@ def testAnUnknownKeyIsAnError(store: Store, config: Config) -> None:
     report: ValidationReport = validate(store)
 
     assert RULE_UNKNOWN_KEY in rules(report)
-
-
-def testAProposedKeyIsNotAnUnknownKey(store: Store, config: Config) -> None:
-    """
-    A ticket may use a proposed key immediately, so that is a warning about the key rather than an error about the ticket.
-    """
-
-    writeRaw(config, "todo", "META-1_a.md", makeText("META-1"))
-
-    report: ValidationReport = validate(store)
-
-    assert report.isValid
-    assert RULE_UNKNOWN_KEY not in rules(report)
-    assert RULE_KEY_UNAPPROVED in rules(report)
 
 
 def testAFilenameMismatchIsAnError(store: Store, config: Config) -> None:
@@ -325,39 +309,17 @@ def testOneBrokenFileDoesNotHideTheRest(store: Store, config: Config) -> None:
     assert RULE_MISSING_DEPENDENCY in firedRules
 
 
-def testAProposedKeyIsAWarningNotAnError(store: Store) -> None:
+def testWarningsAloneStillCountAsValid() -> None:
     """
-    A proposal is reported until a human promotes it, but it does not block.
-    """
+    A pre-commit hook must not fail on a warning, so only errors invalidate.
 
-    report: ValidationReport = validate(store)
-
-    assert report.isValid
-    assert [finding.severity for finding in report.findings] == [SEVERITY_WARNING, SEVERITY_WARNING]
-
-
-def testAnUnusedProposedKeyIsASecondWarning(store: Store, config: Config) -> None:
-    """
-    A proposal nothing ever used is probably abandoned, which is worth saying separately from awaiting approval.
+    No rule emits a warning today, so the split is asserted against a constructed report rather than a fixture.
     """
 
-    assert RULE_KEY_UNUSED in rules(validate(store))
-
-    writeRaw(config, "todo", "META-1_a.md", makeText("META-1"))
-
-    assert RULE_KEY_UNUSED not in rules(validate(store))
-
-
-def testWarningsAloneStillCountAsValid(store: Store, config: Config) -> None:
-    """
-    A pre-commit hook must not fail on a pending proposal, so only errors invalidate.
-    """
-
-    writeRaw(config, "todo", "META-1_a.md", makeText("META-1"))
-
-    report: ValidationReport = validate(store)
+    report: ValidationReport = ValidationReport(findings=[Finding(severity=SEVERITY_WARNING, rule="somethingSoft", message="soft.")])
 
     assert report.warnings
+    assert report.errors == []
     assert report.isValid
 
 
@@ -372,7 +334,7 @@ def testTheReportSerializesForTheMcpSurface(store: Store, config: Config) -> Non
 
     assert payload["valid"] is False
     assert payload["errorCount"] == 1
-    assert payload["warningCount"] == 2
+    assert payload["warningCount"] == 0
 
     finding = payload["findings"][0]
     assert set(finding) == {"severity", "rule", "message", "id", "path"}
