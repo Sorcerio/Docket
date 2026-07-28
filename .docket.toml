@@ -1,0 +1,18 @@
+# Docket configuration.
+# This file is hand-maintained. Comments and key order survive every write the tool makes.
+
+# Where tickets live, relative to this file.
+root = "docs/tickets"
+
+# Tickets with status todo or wip live here. Only done moves a file.
+todoDir = "todo"
+doneDir = "done"
+
+# Priority is an integer with 0 most urgent. New tickets get defaultPriority, and validate enforces the ceiling.
+defaultPriority = 2
+maxPriority = 4
+
+# Keys group related work. A ticket id is <KEY>-<NUM>.
+# Add a key here with a short description of what it covers, or run `docket key add <KEY> "<DESCRIPTION>"`. A key must exist before tickets can use it.
+# An agent adds one through add_key, which it is told to do only after asking you first.
+[keys]
