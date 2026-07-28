@@ -2,7 +2,7 @@
 id: FEAT-8
 title: Host Flag
 status: todo
-priority: 2
+priority: 4
 requires: []
 ---
 
