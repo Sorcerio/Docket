@@ -5,6 +5,8 @@ A per-repo ticketing system that is a plain-markdown collection a human can read
 Docket is developed here and deployed into any number of consumer repositories with one command.
 A consumer repository receives ticket data and configuration. It never receives a copy of the tool.
 
+![Docket demo](docs/demo/docket.gif)
+
 ## Install
 
 Once per machine:
