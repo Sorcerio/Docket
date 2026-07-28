@@ -21,6 +21,7 @@ from typing import Any, Optional
 
 from mcp.server.fastmcp import FastMCP
 
+from docket import __version__
 from docket.core.config import Config, discoverConfig
 from docket.core.graph import ResolvedGraph, dependencyContext, resolveGraph, subgraphForId, subgraphForKey
 from docket.core.mermaid import renderGraph
@@ -49,6 +50,10 @@ Keys are closed. Call `list_keys` before `create_ticket`. When no existing key f
 # MARK: Server
 
 mcp: FastMCP = FastMCP(name=SERVER_NAME, instructions=SERVER_INSTRUCTIONS)
+
+# `FastMCP` accepts no version and forwards none to the lowlevel server it wraps, which then falls back to reporting the `mcp` package's own version as ours.
+# Assigning it here is the only way to advertise the real one. `version` is a plain attribute on that server, read when the client initializes, so a late assignment still reaches the handshake.
+mcp._mcp_server.version = __version__
 
 # MARK: Functions
 
