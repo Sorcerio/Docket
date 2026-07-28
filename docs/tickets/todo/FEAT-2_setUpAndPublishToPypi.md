@@ -2,8 +2,8 @@
 id: FEAT-2
 title: Set up and publish to PyPI
 status: todo
-priority: 2
-requires: [FEAT-1]
+priority: 3
+requires: [BUG-1, BUG-2, FEAT-4, FEAT-5, FEAT-7]
 ---
 
 # Set up and publish to PyPI

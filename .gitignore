@@ -12,3 +12,4 @@ wheels/
 # Systems
 .DS_Store
 .claude/
+graph.mmd
