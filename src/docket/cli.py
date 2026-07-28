@@ -112,9 +112,63 @@ class Output:
 # MARK: Functions
 
 
-def buildParser() -> argparse.ArgumentParser:
+def describeKeys(config: Optional[Config]) -> str:
+    """
+    Describe the keys an argument accepts, for appending to its help text.
+
+    The registry is per-repository, so the options can only be named once a configuration has been found. Without one the description stays general rather than guessing.
+
+    config: The configuration holding the registry, or `None` when none was found.
+
+    Returns the sentence to append.
+    """
+
+    if config is None:
+        return "Must be registered."
+
+    registered: str = ", ".join(sorted(config.registeredKeys))
+
+    # A registry with nothing in it is a real state after a fresh deploy, so name it rather than printing an empty list.
+    return f"One of: {registered}." if registered else "None are registered yet. Add one with 'docket key add'."
+
+
+def describePriorities(config: Optional[Config]) -> str:
+    """
+    Describe the priorities an argument accepts, for appending to its help text.
+
+    The band runs from 0 through the configured `maxPriority`, so like the key registry it can only be listed once a configuration has been found.
+
+    config: The configuration holding the band, or `None` when none was found.
+
+    Returns the sentence to append.
+    """
+
+    if config is None:
+        return "0 is most urgent."
+
+    return f"One of: {', '.join(str(priority) for priority in range(config.maxPriority + 1))}. 0 is most urgent."
+
+
+def tryDiscoverConfig() -> Optional[Config]:
+    """
+    Load the configuration governing the current directory, without insisting that one exists.
+
+    Only the help text depends on this, and every command that truly needs a configuration discovers it again through `dispatch`, so a missing one must not stop the parser from being built. That is what keeps `--help`, `--version`, and `deploy` working outside a repository.
+
+    Returns the loaded `Config`, or `None` when none could be loaded.
+    """
+
+    try:
+        return discoverConfig()
+    except DocketError:
+        return None
+
+
+def buildParser(config: Optional[Config] = None) -> argparse.ArgumentParser:
     """
     Build the top-level argument parser and every subcommand parser.
+
+    config: The configuration whose keys and priority band the help text names, or `None` to describe both in general terms.
 
     Returns the configured `argparse.ArgumentParser`.
     """
@@ -124,31 +178,35 @@ def buildParser() -> argparse.ArgumentParser:
         description="A per-repo ticketing system that is plain markdown for humans and structured MCP for agents.",
         formatter_class=RichHelpFormatter,
     )
-    parser.add_argument("--version", action="version", version=f"{PROGRAM_NAME} {__version__}")
+    parser.add_argument("-V", "--version", action="version", version=f"{PROGRAM_NAME} {__version__}")
 
     commands = parser.add_subparsers(dest="command", metavar="COMMAND")
 
+    # Name the discrete options once, since every argument that takes a key or a priority describes the same set.
+    keyOptions: str = describeKeys(config)
+    priorityOptions: str = describePriorities(config)
+
     # Creating a ticket, which allocates the id and freezes the filename.
     newParser: argparse.ArgumentParser = commands.add_parser("new", help="Create a ticket.", formatter_class=RichHelpFormatter)
-    newParser.add_argument("--key", required=True, help="The key to mint under. Must be registered.")
-    newParser.add_argument("--title", required=True, help="The ticket title. The filename slug derives from this once, here.")
-    newParser.add_argument("--requires", help="Comma-separated ids this ticket depends on.")
-    newParser.add_argument("--priority", type=int, help="Priority, 0 most urgent. Defaults to the configured defaultPriority.")
-    newParser.add_argument("--body", help="Prose for the body, placed under a heading built from the title.")
+    newParser.add_argument("-k", "--key", required=True, help=f"The key to mint under. {keyOptions}")
+    newParser.add_argument("-t", "--title", required=True, help="The ticket title. The filename slug derives from this once, here.")
+    newParser.add_argument("-r", "--requires", help="Comma-separated ids this ticket depends on.")
+    newParser.add_argument("-p", "--priority", type=int, help=f"Priority, defaulting to the configured defaultPriority. {priorityOptions}")
+    newParser.add_argument("-b", "--body", help="Prose for the body, placed under a heading built from the title.")
 
     showParser: argparse.ArgumentParser = commands.add_parser("show", help="Show a ticket with its resolved dependency context.", formatter_class=RichHelpFormatter)
     showParser.add_argument("id", help="The ticket id.")
 
     listParser: argparse.ArgumentParser = commands.add_parser("list", help="List ticket summaries.", formatter_class=RichHelpFormatter)
-    listParser.add_argument("--status", choices=STATUSES, help="Keep only tickets with this status.")
-    listParser.add_argument("--key", help="Keep only tickets carrying this key.")
-    listParser.add_argument("--priority-max", type=int, dest="priorityMax", help="Keep only tickets at or below this priority number.")
+    listParser.add_argument("-s", "--status", choices=STATUSES, help="Keep only tickets with this status.")
+    listParser.add_argument("-k", "--key", help=f"Keep only tickets carrying this key. {keyOptions}")
+    listParser.add_argument("-m", "--priority-max", type=int, dest="priorityMax", help=f"Keep only tickets at or below this priority number. {priorityOptions}")
 
     setParser: argparse.ArgumentParser = commands.add_parser("set", help="Change a ticket's title, priority, or dependencies.", formatter_class=RichHelpFormatter)
     setParser.add_argument("id", help="The ticket id.")
-    setParser.add_argument("--title", help="A new title. The filename does not follow it, since filenames are frozen at creation.")
-    setParser.add_argument("--priority", type=int, help="A new priority.")
-    setParser.add_argument("--requires", help=f"A replacement comma-separated dependency list. Pass '{CLEAR_SENTINEL}' to clear it.")
+    setParser.add_argument("-t", "--title", help="A new title. The filename does not follow it, since filenames are frozen at creation.")
+    setParser.add_argument("-p", "--priority", type=int, help=f"A new priority. {priorityOptions}")
+    setParser.add_argument("-r", "--requires", help=f"A replacement comma-separated dependency list. Pass '{CLEAR_SENTINEL}' to clear it.")
 
     statusParser: argparse.ArgumentParser = commands.add_parser("status", help="Change a ticket's status, moving its file to match.", formatter_class=RichHelpFormatter)
     statusParser.add_argument("id", help="The ticket id.")
@@ -156,9 +214,9 @@ def buildParser() -> argparse.ArgumentParser:
 
     graphParser: argparse.ArgumentParser = commands.add_parser("graph", help="Render the dependency graph as mermaid source.", formatter_class=RichHelpFormatter)
     graphScope = graphParser.add_mutually_exclusive_group()
-    graphScope.add_argument("--id", help="Scope to one ticket's ancestors and descendants.")
-    graphScope.add_argument("--key", help="Scope to one key, plus its immediate cross-key neighbors.")
-    graphParser.add_argument("--out", help="Write to a file rather than to stdout.")
+    graphScope.add_argument("-i", "--id", help="Scope to one ticket's ancestors and descendants.")
+    graphScope.add_argument("-k", "--key", help=f"Scope to one key, plus its immediate cross-key neighbors. {keyOptions}")
+    graphParser.add_argument("-o", "--out", help="Write to a file rather than to stdout.")
 
     keyParser: argparse.ArgumentParser = commands.add_parser("key", help="Inspect and manage the key registry.", formatter_class=RichHelpFormatter)
     keyCommands = keyParser.add_subparsers(dest="keyCommand", metavar="SUBCOMMAND")
@@ -168,10 +226,10 @@ def buildParser() -> argparse.ArgumentParser:
     keyAddParser: argparse.ArgumentParser = keyCommands.add_parser("add", help="Register a new key.", formatter_class=RichHelpFormatter)
     keyAddParser.add_argument("key", help="The key to add.")
     keyAddParser.add_argument("description", help="What the key groups.")
-    keyAddParser.add_argument("--rationale", help="Why the key was added, written as a comment above it.")
+    keyAddParser.add_argument("-r", "--rationale", help="Why the key was added, written as a comment above it.")
 
     keyRemoveParser: argparse.ArgumentParser = keyCommands.add_parser("remove", help="Remove a key no ticket uses.", formatter_class=RichHelpFormatter)
-    keyRemoveParser.add_argument("key", help="The key to remove.")
+    keyRemoveParser.add_argument("key", help=f"The key to remove. {keyOptions}")
 
     commands.add_parser("validate", help="Run every integrity rule.", formatter_class=RichHelpFormatter)
 
@@ -193,7 +251,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     Returns the process exit code.
     """
 
-    parser: argparse.ArgumentParser = buildParser()
+    # Read the configuration before the parser is built, so the help text can name the keys and priorities this repository actually allows. A missing one is not fatal here, since the commands that need it say so themselves.
+    config: Optional[Config] = tryDiscoverConfig()
+
+    parser: argparse.ArgumentParser = buildParser(config)
     args: argparse.Namespace = parser.parse_args(argv)
     output: Output = Output()
 
@@ -204,17 +265,18 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     # Every core failure surfaces here as a message and an exit code, which is the whole of the CLI's error handling.
     try:
-        return dispatch(args, output)
+        return dispatch(args, config, output)
     except DocketError as error:
         output.error(str(error))
         return EXIT_USAGE
 
 
-def dispatch(args: argparse.Namespace, output: Output) -> int:
+def dispatch(args: argparse.Namespace, config: Optional[Config], output: Output) -> int:
     """
     Route parsed arguments to the command that handles them.
 
     args: The parsed arguments.
+    config: The configuration already discovered for the help text, or `None` when none was found.
     output: Where to write.
 
     Returns the process exit code.
@@ -224,8 +286,8 @@ def dispatch(args: argparse.Namespace, output: Output) -> int:
     if args.command in ("deploy", "upgrade"):
         return commandDeploy(args, output)
 
-    # Every other command works against the configuration governing the current directory.
-    store: Store = Store(discoverConfig())
+    # Every other command works against the configuration governing the current directory. Discovery is repeated when the parser was built without one, so the reason it could not be found is reported by the code that knows it.
+    store: Store = Store(config if config is not None else discoverConfig())
 
     handlers = {
         "new": commandNew,
@@ -311,6 +373,10 @@ def commandList(args: argparse.Namespace, store: Store, output: Output) -> int:
 
     Returns the process exit code.
     """
+
+    # An unregistered key cannot match a ticket, so name it rather than reporting an empty result the user would read as "no work here".
+    if args.key is not None:
+        store.config.requireKnownKey(args.key)
 
     tickets: list[Ticket] = store.loadAll().filtered(status=args.status, key=args.key, priorityMax=args.priorityMax)
 
@@ -398,6 +464,8 @@ def commandGraph(args: argparse.Namespace, store: Store, output: Output) -> int:
     if args.id is not None:
         graph = subgraphForId(graph, args.id)
     elif args.key is not None:
+        # For the same reason as `list`, an unregistered key here would render an empty graph rather than admitting the key does not exist.
+        store.config.requireKnownKey(args.key)
         graph = subgraphForKey(graph, args.key)
 
     source: str = renderGraph(graph)

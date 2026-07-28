@@ -1,7 +1,7 @@
 ---
 id: FEAT-4
 title: Shorthand for CLI
-status: todo
+status: done
 priority: 2
 requires: []
 ---

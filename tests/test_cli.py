@@ -12,7 +12,7 @@ from typing import Iterator
 
 import pytest
 
-from docket.cli import EXIT_INVALID, EXIT_OK, EXIT_USAGE, main, parseIdList
+from docket.cli import EXIT_INVALID, EXIT_OK, EXIT_USAGE, describeKeys, describePriorities, main, parseIdList, tryDiscoverConfig
 from docket.core.config import Config, loadConfig
 from docket.core.errors import InvalidIdError
 
@@ -524,6 +524,165 @@ def testCommandsWorkFromASubdirectory(inRepo: Path, capsys: pytest.CaptureFixtur
         os.chdir(previous)
 
     assert "App shell" in capsys.readouterr().out
+
+
+def testKeyDescriptionNamesTheRegistry(config: Config) -> None:
+    """
+    The registry is per-repository, so the help text lists what this one actually accepts.
+    """
+
+    assert describeKeys(config) == "One of: CORE, GEN, HEAD, META."
+
+
+def testKeyDescriptionWithoutAConfiguration() -> None:
+    """
+    With no configuration there is no registry to read, so the description stays general rather than guessing.
+    """
+
+    assert describeKeys(None) == "Must be registered."
+
+
+def testKeyDescriptionWithAnEmptyRegistry(tmp_path: Path) -> None:
+    """
+    A registry with nothing in it is the state right after a deploy, so it is named rather than printed as an empty list.
+    """
+
+    configPath: Path = tmp_path / ".docket.toml"
+    configPath.write_text("root = \"docs/tickets\"\n", encoding="utf-8", newline="\n")
+
+    assert "docket key add" in describeKeys(loadConfig(configPath))
+
+
+def testPriorityDescriptionNamesTheBand(config: Config) -> None:
+    """
+    The band runs from 0 through the configured maxPriority, which is 4 in the sample configuration.
+    """
+
+    assert describePriorities(config) == "One of: 0, 1, 2, 3, 4. 0 is most urgent."
+
+
+def testPriorityDescriptionWithoutAConfiguration() -> None:
+    """
+    Without a configuration the band is unknown, so only the direction is stated.
+    """
+
+    assert describePriorities(None) == "0 is most urgent."
+
+
+def testHelpNamesTheRegisteredKeys(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Help for an argument taking a key lists the keys, so the options are visible without a second command.
+    """
+
+    with pytest.raises(SystemExit):
+        main(["new", "--help"])
+
+    out: str = capsys.readouterr().out
+
+    assert "CORE" in out
+    assert "META" in out
+
+
+def testHelpWorksOutsideARepository(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Help is built before any command runs, so a missing configuration must degrade the text rather than stop the parser.
+    """
+
+    (tmp_path / ".git").mkdir()
+
+    previous: str = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        assert tryDiscoverConfig() is None
+
+        with pytest.raises(SystemExit) as excInfo:
+            main(["new", "--help"])
+    finally:
+        os.chdir(previous)
+
+    assert excInfo.value.code == EXIT_OK
+    assert "Must be registered." in capsys.readouterr().out
+
+
+def testShorthandFlagsDriveNewAndSet(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Every short flag reaches the same handler its long form does.
+    """
+
+    assert main(["new", "-k", "CORE", "-t", "Skirmish setup", "-p", "1", "-b", "Goal: one battle."]) == EXIT_OK
+    assert main(["new", "-k", "GEN", "-t", "Battlescape", "-r", "CORE-1", "-p", "0"]) == EXIT_OK
+    assert main(["set", "GEN-1", "-t", "Renamed", "-p", "3", "-r", "none"]) == EXIT_OK
+
+    capsys.readouterr()
+
+    main(["show", "GEN-1"])
+    out: str = capsys.readouterr().out
+
+    assert "Renamed" in out
+    assert "priority 3" in out
+
+
+def testShorthandFlagsDriveListAndGraph(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The read commands take the same shorthands, including the file destination.
+    """
+
+    main(["new", "-k", "CORE", "-t", "App shell", "-p", "0"])
+    main(["new", "-k", "GEN", "-t", "Battlescape", "-p", "4"])
+    capsys.readouterr()
+
+    assert main(["list", "-s", "todo", "-k", "CORE", "-m", "0"]) == EXIT_OK
+
+    out: str = capsys.readouterr().out
+
+    assert "App shell" in out
+    assert "Battlescape" not in out
+
+    target: Path = inRepo / "out" / "graph.mmd"
+
+    assert main(["graph", "-k", "CORE", "-o", str(target)]) == EXIT_OK
+    assert target.read_text(encoding="utf-8").startswith("graph TD\n")
+
+
+def testListRejectsAnUnregisteredKey(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    An unregistered key cannot match a ticket, so it is named rather than reported as an empty result.
+    """
+
+    assert main(["list", "-k", "NOPE"]) == EXIT_USAGE
+    assert "not registered" in capsys.readouterr().err
+
+
+def testGraphRejectsAnUnregisteredKey(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Scoping the graph to a key that does not exist would render an empty graph, which reads as an answer rather than a mistake.
+    """
+
+    assert main(["graph", "-k", "NOPE"]) == EXIT_USAGE
+    assert "not registered" in capsys.readouterr().err
+
+
+def testListAcceptsAPriorityMaxAboveTheBand(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    A ceiling above the band still describes the right set, so it is answered rather than refused.
+    """
+
+    main(["new", "-k", "CORE", "-t", "App shell"])
+    capsys.readouterr()
+
+    assert main(["list", "-m", "99"]) == EXIT_OK
+    assert "App shell" in capsys.readouterr().out
+
+
+def testVersionShorthand(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The version is reachable by its short flag as well as its long one.
+    """
+
+    with pytest.raises(SystemExit):
+        main(["-V"])
+
+    assert "docket" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(

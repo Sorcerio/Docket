@@ -91,19 +91,23 @@ The filename is `CORE-14_skirmishSetup.md`, frozen at creation. Retitling does n
 ## CLI
 
 ```bash
-docket new --key CORE --title "Skirmish setup" [--requires CORE-9,GEN-3] [--priority 1] [--body TEXT]
+docket new -k CORE -t "Skirmish setup" [-r CORE-9,GEN-3] [-p 1] [-b TEXT]
 docket show CORE-14
-docket list [--status todo] [--key CORE] [--priority-max 2]
-docket set CORE-14 [--title TEXT] [--priority N] [--requires A,B|none]
+docket list [-s todo] [-k CORE] [-m 2]
+docket set CORE-14 [-t TEXT] [-p N] [-r A,B|none]
 docket status CORE-14 done
-docket graph [--id CORE-14 | --key GEN] [--out FILE]
+docket graph [-i CORE-14 | -k GEN] [-o FILE]
 docket key list
-docket key add META "campaign and progression" [--rationale TEXT]
+docket key add META "campaign and progression" [-r TEXT]
 docket key remove META
 docket validate
 docket deploy PATH
 docket upgrade PATH
 ```
+
+Every short flag has a long form: `-k/--key`, `-t/--title`, `-r/--requires`, `-p/--priority`, `-b/--body`, `-s/--status`, `-m/--priority-max`, `-i/--id`, `-o/--out`, `-r/--rationale`, `-V/--version`.
+
+Where an argument takes one of a discrete set, `--help` lists the set. The keys come from your `[keys]` table and the priorities from `0` through `maxPriority`, so the options shown are the ones this repository actually accepts.
 
 > [!IMPORTANT]
 > In Windows Powershell, the \` character can be contextually treated as _an escape character_!
