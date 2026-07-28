@@ -206,7 +206,6 @@ wheels = [
 
 [[package]]
 name = "docket"
-version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "mcp" },

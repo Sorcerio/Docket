@@ -1,6 +1,6 @@
 [project]
 name = "docket"
-version = "0.1.1"
+dynamic = ["version"]
 description = "A per-repo ticketing system that is plain markdown for humans and structured MCP for agents"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -19,6 +19,9 @@ docket-mcp = "docket.server:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/docket/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/docket"]

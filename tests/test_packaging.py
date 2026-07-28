@@ -1,7 +1,7 @@
 """
 Packaging Tests
 
-Verify the package imports and that both console script entry points are callable.
+Verify the package imports, that both console script entry points are callable, and that every surface reports one version.
 """
 
 # MARK: Imports
@@ -14,9 +14,9 @@ from docket import cli, server
 # MARK: Functions
 
 
-def testVersionIsExposed() -> None:
+def testVersionIsExposed(capsys: pytest.CaptureFixture[str]) -> None:
     """
-    The package exposes a version string that matches what the CLI reports.
+    The package exposes a version string that the CLI reports back.
     """
 
     assert docket.__version__
@@ -26,6 +26,17 @@ def testVersionIsExposed() -> None:
         cli.main(["--version"])
 
     assert excInfo.value.code == 0
+    assert docket.__version__ in capsys.readouterr().out
+
+
+def testServerReportsTheSameVersion() -> None:
+    """
+    The MCP server advertises the package version rather than the `mcp` library's.
+
+    `FastMCP` forwards no version to the lowlevel server it wraps, which falls back to reporting its own package's version, so this asserts the assignment that corrects it is still in place.
+    """
+
+    assert server.mcp._mcp_server.version == docket.__version__
 
 
 def testCliWithNoCommandIsAUsageError() -> None:

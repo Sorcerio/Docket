@@ -20,6 +20,14 @@ Match existing style exactly:
 - No em dashes anywhere, in code, comments, docs, or output.
 - Never break a line mid-sentence in prose/docs/comments. One sentence stays on one line, word wrap handles width.
 
+## Versioning
+
+The version lives in exactly one place, `__version__` in `src/docket/__init__.py`. `pyproject.toml` reads it from there through `[tool.hatch.version]` and declares no version of its own, `cli.py` imports it for `--version`, and `server.py` assigns it onto the lowlevel MCP server. Never add a second literal.
+
+Bump it with `python scripts/bumpVersion.py <version|major|minor|patch>`, never by hand. Completing a ticket earns at least a patch bump.
+
+Scripts under `scripts/` are standalone and import nothing from `docket`, so they stay liftable into another project. They are the one place a `_name` prefix is not used for a module-level helper, since the whole point is that they are copied.
+
 ## Naming across interfaces
 
 camelCase is the repo-wide Python convention above. Two external interfaces do NOT follow it, on purpose:

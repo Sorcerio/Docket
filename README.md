@@ -173,6 +173,22 @@ uv run docket --help
 
 The core library holds every rule. The CLI and the MCP server are thin shells over it and contain no logic of their own, which is what keeps the two surfaces from ever disagreeing.
 
+### Versioning
+
+The version is written in exactly one place, `src/docket/__init__.py`. `pyproject.toml` declares no version of its own and reads that one at build time, the CLI reports it through `--version`, and the MCP server advertises it on connect. Nothing else needs editing.
+
+Bump it with the script rather than by hand, which validates the new version and resyncs the lock file for you:
+
+```bash
+python scripts/bumpVersion.py patch
+python scripts/bumpVersion.py 0.2.0
+python scripts/bumpVersion.py minor --dry-run
+```
+
+The version argument is either an explicit semantic version or one of `major`, `minor`, or `patch`. Anything that is not three plain numbers is refused, as is a version that does not come after the current one. `--dry-run` reports the change without writing it.
+
+Run `uv sync` after a bump, since the installed metadata carries the old version until you do.
+
 ### Local Installation
 
 You can install Docket as a tool from your repo root:
