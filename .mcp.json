@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "docket": {
+      "type": "stdio",
+      "command": "docket-mcp",
+      "args": []
+    }
+  }
+}
