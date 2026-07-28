@@ -5,7 +5,7 @@ description = "A per-repo ticketing system that is plain markdown for humans and
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "mcp>=1.28.1",
+    "mcp>=1.28.1,<2",
     "pyyaml>=6.0.3",
     "rich>=15.0.0",
     "rich-argparse>=1.8.0",
