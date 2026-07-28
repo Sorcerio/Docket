@@ -1,7 +1,7 @@
 ---
 id: FEAT-3
 title: All Tickets Graph
-status: todo
+status: done
 priority: 2
 requires: []
 ---
