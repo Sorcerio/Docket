@@ -23,11 +23,13 @@ The version lives in exactly one place, `__version__` in `src/docket/__init__.py
 
 | Part | When |
 |---|---|
-| `patch` | The default. Any finished ticket, bug fix, internal refactor, docs, or test work. |
-| `minor` | A new user-facing capability. A new CLI subcommand, a new MCP tool, a new config key, a new frontmatter field. |
+| `minor` | The default. Any finished ticket, whatever it turned out to involve. |
+| `patch` | Work no ticket covers. A stray docs fix, a lint pass, a test-only change. |
 | `major` | A break in a contract someone else depends on. A renamed or removed CLI subcommand, MCP tool, or MCP parameter, a changed ticket frontmatter schema, a changed `docket.toml` key, or a change to how ticket files are laid out on disk. |
 
-Completing a ticket earns at least a patch. Reach for `minor` or `major` only when the table above actually calls for it, and say why when you do.
+Completing a ticket earns a minor. Reach for `major` only when the table above actually calls for it, and say why when you do.
+
+One pull request is one bump, no matter how many tickets it closes. Two tickets landing together is still a single minor, so bump once for the branch rather than once per ticket.
 
 ## What the script refuses
 
