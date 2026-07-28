@@ -167,6 +167,30 @@ def testCreateTicketUnderAnUnknownKeyErrors(inRepo: Path) -> None:
     assert "add_key" in str(excInfo.value)
 
 
+@pytest.mark.parametrize(
+    "tool,arguments",
+    [
+        ("create_ticket", {"key": "CORE", "title": ""}),
+        ("update_ticket", {"id": "CORE-1", "title": "   "}),
+        ("add_key", {"key": "NEW", "description": "", "rationale": "why"}),
+    ],
+)
+def testEmptyTextIsRefused(inRepo: Path, tool: str, arguments: dict[str, Any]) -> None:
+    """
+    A model can send an empty string as easily as a shell can, so the rule lives in the core where both surfaces meet it.
+
+    tool: The tool under test.
+    arguments: The call arguments carrying the empty value.
+    """
+
+    callTool("create_ticket", {"key": "CORE", "title": "Original"})
+
+    with pytest.raises(Exception) as excInfo:
+        callTool(tool, arguments)
+
+    assert "cannot be empty" in str(excInfo.value)
+
+
 def testListTicketsNeverReturnsBodies(inRepo: Path) -> None:
     """
     An agent listing forty tickets must not pay for forty bodies.

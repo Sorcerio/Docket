@@ -73,6 +73,22 @@ class InvalidPriorityError(DocketError):
     """
 
 
+class EmptyValueError(DocketError):
+    """
+    Raised when a value that must carry text arrived empty or as only whitespace.
+
+    A shell that drops an empty argument before the process starts turns this into its own usage error instead, which is why this exists for the shells that pass one through.
+    """
+
+
+class OutputPathError(DocketError):
+    """
+    Raised when a path supplied as a destination cannot be written to.
+
+    This covers an empty path, a path naming an existing directory, and a location the filesystem refuses.
+    """
+
+
 class TicketParseError(DocketError):
     """
     Raised when a file under the ticket root is not a readable ticket.

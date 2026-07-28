@@ -7,6 +7,21 @@ A consumer repository receives ticket data and configuration. It never receives 
 
 ![Docket demo](docs/demo/docket.gif)
 
+* [docket](#docket)
+    * [Install](#install)
+    * [Deploy into a Repository](#deploy-into-a-repository)
+    * [What a Ticket Looks Like](#what-a-ticket-looks-like)
+    * [Three Ideas Worth Knowing](#three-ideas-worth-knowing)
+    * [CLI](#cli)
+    * [MCP](#mcp)
+    * [Configuration](#configuration)
+    * [Validation Rules](#validation-rules)
+    * [Development](#development)
+        * [Working on the Repo](#working-on-the-repo)
+        * [Local Installation](#local-installation)
+
+---
+
 ## Install
 
 Once per machine:
@@ -79,7 +94,7 @@ The filename is `CORE-14_skirmishSetup.md`, frozen at creation. Retitling does n
 docket new --key CORE --title "Skirmish setup" [--requires CORE-9,GEN-3] [--priority 1] [--body TEXT]
 docket show CORE-14
 docket list [--status todo] [--key CORE] [--priority-max 2]
-docket set CORE-14 [--title TEXT] [--priority N] [--requires A,B]
+docket set CORE-14 [--title TEXT] [--priority N] [--requires A,B|none]
 docket status CORE-14 done
 docket graph [--id CORE-14 | --key GEN] [--out FILE]
 docket key list
@@ -91,6 +106,8 @@ docket upgrade PATH
 ```
 
 `show` prints the body with resolved dependency context, not the raw file. Use `cat` for that.
+
+`set --requires none` clears a ticket's dependencies.
 
 `graph` writes bare mermaid source to stdout, so it pipes and redirects cleanly. GitHub and most editors render it natively.
 
@@ -146,6 +163,8 @@ Errors: a `requires` entry naming an id that does not exist, a dependency cycle,
 
 ## Development
 
+### Working on the Repo
+
 ```bash
 uv sync
 uv run pytest
@@ -153,3 +172,16 @@ uv run docket --help
 ```
 
 The core library holds every rule. The CLI and the MCP server are thin shells over it and contain no logic of their own, which is what keeps the two surfaces from ever disagreeing.
+
+### Local Installation
+
+You can install Docket as a tool from your repo root:
+
+```bash
+cd /your/repo/root/
+uv tool install .
+```
+
+When adding new files, changing primary version number, and making other changes, unexpected behavior can occur.
+
+Avoid this by updating your installation by running the install command again.

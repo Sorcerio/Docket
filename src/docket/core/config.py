@@ -16,6 +16,7 @@ from tomlkit.items import Comment, Table
 from docket.core.errors import ConfigError, ConfigNotFoundError, InvalidKeyError, UnknownKeyError
 from docket.core.fields import readInt, readString
 from docket.core.ids import requireValidKey
+from docket.core.inputs import requireText
 
 # MARK: Constants
 
@@ -219,6 +220,9 @@ class Config:
         """
 
         requireValidKey(key)
+
+        # The description is the only thing telling a later reader what the key groups, so an empty one defeats the point of registering it.
+        requireText(description, "key description")
 
         # A key that already exists is not an addition, it is a mistake worth naming.
         if self.isRegisteredKey(key):
