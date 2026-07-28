@@ -1,7 +1,7 @@
 ---
 id: BUG-1
 title: Fix Character Encoding Issue in FEAT-5
-status: todo
+status: done
 priority: 1
 requires: []
 ---

@@ -13,3 +13,4 @@ wheels/
 .DS_Store
 .claude/
 graph.mmd
+scripts/

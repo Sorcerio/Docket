@@ -105,13 +105,13 @@ docket deploy PATH
 docket upgrade PATH
 ```
 
-`show` prints the body with resolved dependency context, not the raw file. Use `cat` for that.
-
-`set --requires none` clears a ticket's dependencies.
-
-`graph` writes bare mermaid source to stdout, so it pipes and redirects cleanly. GitHub and most editors render it natively.
-
-`validate` exits `1` when it finds errors and `0` when it finds only warnings, which is what makes it usable in a pre-commit hook or in CI.
+> [!IMPORTANT]
+> In Windows Powershell, the \` character can be contextually treated as _an escape character_!
+> 
+> Typing, "Use \`argparse\` instead", will result in an escaped `a` character as `\x07`.
+> If providing code blocks in a body, use the MCP surface or simply update your ticket body in your favorite text editor.
+>
+> The MCP surface, bash, and similar non-Windows terminals _do not_ have this issue.
 
 ## MCP
 
