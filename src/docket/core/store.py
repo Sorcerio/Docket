@@ -8,7 +8,7 @@ Discovery, loading, writing, and mutation of tickets on disk.
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Any, Iterator, Optional
 
 from docket.core.config import Config
 from docket.core.errors import InvalidPriorityError, InvalidStatusError, TicketNotFoundError, TicketParseError
@@ -369,6 +369,31 @@ class Store:
 
         if requires is not None:
             ticket.requires = list(requires)
+
+        return TicketResult(ticket=self.write(ticket), warnings=self.__danglingWarnings(ticket, existing))
+
+    def setMetadata(self, ticketId: str, key: str, value: Optional[Any]) -> TicketResult:
+        """
+        Set or clear one entry in a ticket's `metadata` map.
+
+        Only the named entry is touched, so one consumer's key survives another consumer writing its own. `value` of `None` removes the entry rather than storing a null, keeping the map free of placeholders nothing reads.
+
+        ticketId: The ticket to change.
+        key: The metadata key, which cannot be empty.
+        value: The value to store, or `None` to remove the key.
+
+        Returns the written ticket and any warnings.
+        """
+
+        requireText(key, "metadata key")
+
+        existing: TicketSet = self.loadAll()
+        ticket: Ticket = existing.get(ticketId)
+
+        if value is None:
+            ticket.metadata.pop(key, None)
+        else:
+            ticket.metadata[key] = value
 
         return TicketResult(ticket=self.write(ticket), warnings=self.__danglingWarnings(ticket, existing))
 

@@ -27,6 +27,7 @@ Prose, unparsed and unconstrained.
 | `status` | `todo`, `wip`, or `done`. Nothing else is valid. |
 | `priority` | Integer, `0` most urgent. |
 | `requires` | Ids this ticket depends on. May be empty. |
+| `metadata` | Free-form `{key: value}` map for any tool or skill to attach data to. Namespace your key so it cannot collide with another consumer's. |
 
 Any other field is preserved untouched, so this repository may add its own.
 
@@ -44,6 +45,7 @@ A ticket file has two halves, and they have different rules.
 |---|---|
 | The prose in the body | Edit the file directly |
 | `title`, `priority`, `requires` | `update_ticket` |
+| one `metadata` entry | `set_metadata` |
 | `status` | `set_status` |
 | Nothing, you just want to read it | `read_ticket` |
 

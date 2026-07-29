@@ -13,7 +13,7 @@ from typing import Any, Optional
 import yaml
 
 from docket.core.errors import TicketParseError
-from docket.core.fields import readInt, readString, readStringList
+from docket.core.fields import readDict, readInt, readString, readStringList
 from docket.core.ids import keyOf
 
 # MARK: Constants
@@ -28,7 +28,7 @@ STATUSES: tuple[str, ...] = (STATUS_TODO, STATUS_WIP, STATUS_DONE)
 FRONTMATTER_DELIMITER: str = "---"
 
 # Field order is explicit rather than incidental, so a rewrite never churns the diff.
-CANONICAL_FIELDS: tuple[str, ...] = ("id", "title", "status", "priority", "requires")
+CANONICAL_FIELDS: tuple[str, ...] = ("id", "title", "status", "priority", "requires", "metadata")
 
 # A very large width keeps `pyyaml` from wrapping a long title across lines.
 YAML_WIDTH: int = 1 << 20
@@ -68,6 +68,10 @@ class Ticket:
     status: str
     priority: int
     requires: list[str] = field(default_factory=list)
+
+    # Free-form entries any tool or skill can attach to a ticket, namespaced by whatever key that consumer chooses.
+    metadata: dict[str, Any] = field(default_factory=dict)
+
     body: str = ""
 
     # Fields the tool does not recognize, kept in the order they were read so a consumer repo can extend the schema without a tool change.
@@ -110,6 +114,7 @@ class Ticket:
             "status": self.status,
             "priority": self.priority,
             "requires": FlowList(self.requires),
+            "metadata": dict(self.metadata),
         }
 
         # Append preserved fields after them, in the order they were read.
@@ -212,11 +217,12 @@ def parseTicket(text: str, path: Optional[Path] = None) -> Ticket:
     status: str = readString(loaded, "status", TicketParseError, FIELD_SOURCE)
     priority: int = readInt(loaded, "priority", TicketParseError, FIELD_SOURCE)
     requires: list[str] = readStringList(loaded, "requires", TicketParseError, FIELD_SOURCE)
+    metadata: dict[str, Any] = readDict(loaded, "metadata", TicketParseError, FIELD_SOURCE)
 
     # Keep everything the tool does not recognize, in the order it was read.
     extra: dict[str, Any] = {name: value for name, value in loaded.items() if name not in CANONICAL_FIELDS}
 
-    return Ticket(id=ticketId, title=title, status=status, priority=priority, requires=requires, body=body, extra=extra, path=path)
+    return Ticket(id=ticketId, title=title, status=status, priority=priority, requires=requires, metadata=metadata, body=body, extra=extra, path=path)
 
 
 def serializeTicket(ticket: Ticket) -> str:

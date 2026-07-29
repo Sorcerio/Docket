@@ -1,9 +1,10 @@
 # docket
 
-A per-repo ticketing system that is a plain-markdown collection a human can read in a text editor and a structured store a Claude Code agent can query over MCP, at the same time.
+Docket provides tickets you can read, version, and control within your existing repository. Your favorite agent can read it too.
 
-Docket is developed here and deployed into any number of consumer repositories with one command.
-A consumer repository receives ticket data and configuration. It never receives a copy of the tool.
+Each ticket is plain markdown. Open it in any text editor and it reads like a note. Underneath, the same file is a structured record, and a Claude Code agent queries it over MCP with no parsing hacks and no hidden sync. One file, two readers.
+
+Docket itself lives in this repo alone. Deploy it into any number of consumer repositories with one command, and only the ticket data and configuration travel. Never a copy of the tool.
 
 ![Docket demo](docs/demo/docket.gif)
 
@@ -18,6 +19,7 @@ A consumer repository receives ticket data and configuration. It never receives 
     * [Validation Rules](#validation-rules)
     * [Development](#development)
         * [Working on the Repo](#working-on-the-repo)
+        * [Versioning](#versioning)
         * [Local Installation](#local-installation)
 
 ---

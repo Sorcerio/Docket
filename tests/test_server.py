@@ -69,11 +69,11 @@ def toolNames() -> list[str]:
 
 def testEveryDocumentedToolIsRegistered() -> None:
     """
-    The surface is exactly the nine tools the design specifies, no more and no fewer.
+    The surface is exactly the ten tools the design specifies, no more and no fewer.
     """
 
     assert sorted(toolNames()) == sorted(
-        ["list_tickets", "read_ticket", "create_ticket", "update_ticket", "set_status", "graph", "list_keys", "add_key", "validate"]
+        ["list_tickets", "read_ticket", "create_ticket", "update_ticket", "set_metadata", "set_status", "graph", "list_keys", "add_key", "validate"]
     )
 
 
@@ -172,6 +172,7 @@ def testCreateTicketUnderAnUnknownKeyErrors(inRepo: Path) -> None:
     [
         ("create_ticket", {"key": "CORE", "title": ""}),
         ("update_ticket", {"id": "CORE-1", "title": "   "}),
+        ("set_metadata", {"id": "CORE-1", "key": "   ", "value": "x"}),
         ("add_key", {"key": "NEW", "description": "", "rationale": "why"}),
     ],
 )
@@ -259,6 +260,57 @@ def testReadTicketCarriesUnknownFields(inRepo: Path) -> None:
     )
 
     assert callTool("read_ticket", {"id": "CORE-1"})["extra"] == {"owner": "brody"}
+
+
+def testReadTicketCarriesMetadata(inRepo: Path) -> None:
+    """
+    Metadata is a recognized field, so it is returned in its own payload key rather than folded into `extra`.
+    """
+
+    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
+    callTool("set_metadata", {"id": "CORE-1", "key": "video", "value": "2026-01-devlog"})
+
+    payload = callTool("read_ticket", {"id": "CORE-1"})
+
+    assert payload["metadata"] == {"video": "2026-01-devlog"}
+    assert "video" not in payload["extra"]
+
+
+def testSetMetadataOnlyTouchesTheNamedKey(inRepo: Path) -> None:
+    """
+    Two consumers writing different keys to the same ticket do not clobber each other.
+    """
+
+    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
+    callTool("set_metadata", {"id": "CORE-1", "key": "video", "value": "2026-01-devlog"})
+
+    payload = callTool("set_metadata", {"id": "CORE-1", "key": "reviewed", "value": True})
+
+    assert payload["metadata"] == {"video": "2026-01-devlog", "reviewed": True}
+
+
+def testSetMetadataWithNullValueRemovesTheKey(inRepo: Path) -> None:
+    """
+    A null value clears the entry rather than storing it as a null.
+    """
+
+    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
+    callTool("set_metadata", {"id": "CORE-1", "key": "video", "value": "2026-01-devlog"})
+
+    payload = callTool("set_metadata", {"id": "CORE-1", "key": "video", "value": None})
+
+    assert payload["metadata"] == {}
+
+
+def testSetMetadataRejectsAnUnknownId(inRepo: Path) -> None:
+    """
+    Setting metadata on a ticket that does not exist is an error rather than silently creating one.
+    """
+
+    with pytest.raises(Exception) as excInfo:
+        callTool("set_metadata", {"id": "CORE-99", "key": "video", "value": "x"})
+
+    assert "CORE-99" in str(excInfo.value)
 
 
 def testReadTicketOnAnUnknownIdErrors(inRepo: Path) -> None:

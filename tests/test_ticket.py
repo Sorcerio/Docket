@@ -23,6 +23,7 @@ title: Skirmish setup
 status: todo
 priority: 1
 requires: [CORE-9, GEN-3]
+metadata: {}
 ---
 
 # Skirmish setup
@@ -47,6 +48,7 @@ def testParseReadsEveryField() -> None:
     assert ticket.status == "todo"
     assert ticket.priority == 1
     assert ticket.requires == ["CORE-9", "GEN-3"]
+    assert ticket.metadata == {}
     assert ticket.key == "CORE"
     assert not ticket.isDone
 
@@ -107,6 +109,7 @@ def testFieldOrderIsCanonicalRegardlessOfSourceOrder() -> None:
     assert lines[3].startswith("status:")
     assert lines[4].startswith("priority:")
     assert lines[5].startswith("requires:")
+    assert lines[6].startswith("metadata:")
 
 
 def testUnknownFieldsSurviveARewrite() -> None:
@@ -121,6 +124,7 @@ def testUnknownFieldsSurviveARewrite() -> None:
         "status: todo\n"
         "priority: 1\n"
         "requires: []\n"
+        "metadata: {}\n"
         "owner: brody\n"
         "tags:\n"
         "- ui\n"
@@ -146,7 +150,7 @@ def testUnknownFieldsKeepTheirReadOrderAfterTheKnownOnes() -> None:
     text: str = serializeTicket(parseTicket(extended))
     lines: list[str] = text.split("\n")
 
-    assert [line.split(":")[0] for line in lines[1:9]] == ["id", "title", "status", "priority", "requires", "owner", "zeta", "alpha"]
+    assert [line.split(":")[0] for line in lines[1:10]] == ["id", "title", "status", "priority", "requires", "metadata", "owner", "zeta", "alpha"]
 
 
 def testCrlfInputParsesAndIsWrittenBackAsLf() -> None:
@@ -312,5 +316,44 @@ def testBuildBodyOutputParsesBackCleanly() -> None:
     ticket: Ticket = Ticket(id="CORE-1", title="App shell", status="todo", priority=2, body=buildBody("App shell", "Prose."))
     text: str = serializeTicket(ticket)
 
-    assert text == "---\nid: CORE-1\ntitle: App shell\nstatus: todo\npriority: 2\nrequires: []\n---\n\n# App shell\n\nProse.\n"
+    assert text == "---\nid: CORE-1\ntitle: App shell\nstatus: todo\npriority: 2\nrequires: []\nmetadata: {}\n---\n\n# App shell\n\nProse.\n"
     assert serializeTicket(parseTicket(text)) == text
+
+
+def testAbsentMetadataIsTreatedAsEmpty() -> None:
+    """
+    A ticket with no metadata may omit the field entirely rather than being refused.
+    """
+
+    minimal: str = "---\nid: CORE-1\ntitle: T\nstatus: todo\npriority: 0\n---\n\n# T\n"
+
+    assert parseTicket(minimal).metadata == {}
+
+
+def testMetadataRoundTripsAsABlockMapping() -> None:
+    """
+    A populated metadata map survives a round trip, rendered in block style like the rest of the frontmatter.
+    """
+
+    text: str = "---\nid: CORE-1\ntitle: T\nstatus: todo\npriority: 0\nrequires: []\nmetadata:\n  video: 2026-01-devlog\n---\n\n# T\n"
+
+    ticket: Ticket = parseTicket(text)
+
+    assert ticket.metadata == {"video": "2026-01-devlog"}
+    assert serializeTicket(ticket) == text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "---\nid: CORE-1\ntitle: T\nstatus: todo\npriority: 0\nmetadata: not a mapping\n---\n\n# T\n",
+        "---\nid: CORE-1\ntitle: T\nstatus: todo\npriority: 0\nmetadata:\n  1: value\n---\n\n# T\n",
+    ],
+)
+def testWrongMetadataShapeIsRejected(text: str) -> None:
+    """
+    A metadata field that is not a mapping, or that has a non-string key, fails at parse.
+    """
+
+    with pytest.raises(TicketParseError):
+        parseTicket(text)

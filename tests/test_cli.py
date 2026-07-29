@@ -319,6 +319,85 @@ def testGraphWritesToANestedOutPath(inRepo: Path, capsys: pytest.CaptureFixture[
     assert "graph TD" in target.read_text(encoding="utf-8")
 
 
+def testMetaSetAddsAKeyAndGetShowsIt(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    A set key is visible in `meta get`, the round trip an agent or a human actually uses.
+    """
+
+    main(["new", "--key", "CORE", "--title", "Skirmish setup"])
+    capsys.readouterr()
+
+    assert main(["meta", "set", "CORE-1", "video", "2026-01-devlog"]) == EXIT_OK
+    capsys.readouterr()
+
+    assert main(["meta", "get", "CORE-1"]) == EXIT_OK
+    out: str = capsys.readouterr().out
+
+    assert "video" in out
+    assert "2026-01-devlog" in out
+
+
+def testMetaGetWithNoMetadataSaysSo(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    A ticket with an empty metadata map is stated rather than printed as a bare table.
+    """
+
+    main(["new", "--key", "CORE", "--title", "Skirmish setup"])
+    capsys.readouterr()
+
+    assert main(["meta", "get", "CORE-1"]) == EXIT_OK
+    assert "No metadata." in capsys.readouterr().out
+
+
+def testMetaSetClearsAKeyWithTheFlag(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    `-c/--clear` removes the key rather than requiring a sentinel value.
+    """
+
+    main(["new", "--key", "CORE", "--title", "Skirmish setup"])
+    main(["meta", "set", "CORE-1", "video", "2026-01-devlog"])
+    capsys.readouterr()
+
+    assert main(["meta", "set", "CORE-1", "video", "-c"]) == EXIT_OK
+    capsys.readouterr()
+
+    main(["meta", "get", "CORE-1"])
+    assert "No metadata." in capsys.readouterr().out
+
+
+def testMetaSetRejectsAValueTogetherWithClear(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Passing both a value and --clear is contradictory, so it is refused rather than resolved silently.
+    """
+
+    main(["new", "--key", "CORE", "--title", "Skirmish setup"])
+    capsys.readouterr()
+
+    assert main(["meta", "set", "CORE-1", "video", "x", "--clear"]) == EXIT_USAGE
+    assert "Cannot pass a value" in capsys.readouterr().err
+
+
+def testMetaSetWithNoValueAndNoClearIsAUsageError(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Nothing to do is refused rather than silently succeeding, matching `set`'s own rule.
+    """
+
+    main(["new", "--key", "CORE", "--title", "Skirmish setup"])
+    capsys.readouterr()
+
+    assert main(["meta", "set", "CORE-1", "video"]) == EXIT_USAGE
+    assert "Nothing to set" in capsys.readouterr().err
+
+
+def testMetaSetOnAnUnknownIdFails(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Setting metadata on a ticket that does not exist is an error.
+    """
+
+    assert main(["meta", "set", "CORE-99", "video", "x"]) == EXIT_USAGE
+    assert "CORE-99" in capsys.readouterr().err
+
+
 def testStatusMovesTheFile(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """
     The frontmatter and the directory are written together, never one without the other.

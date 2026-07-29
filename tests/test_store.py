@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from docket.core.config import Config
-from docket.core.errors import InvalidPriorityError, InvalidStatusError, TicketNotFoundError, UnknownKeyError
+from docket.core.errors import EmptyValueError, InvalidPriorityError, InvalidStatusError, TicketNotFoundError, UnknownKeyError
 from docket.core.store import Store, TicketResult, TicketSet
 from docket.core.ticket import Ticket, parseTicket
 
@@ -319,6 +319,75 @@ def testUpdateRejectsAnUnknownId(store: Store) -> None:
 
     with pytest.raises(TicketNotFoundError):
         store.update("CORE-99", title="Ghost")
+
+
+def testSetMetadataAddsAKey(store: Store) -> None:
+    """
+    Setting a key that is not present yet adds it without disturbing anything else.
+    """
+
+    store.create(key="CORE", title="Skirmish setup")
+
+    result: TicketResult = store.setMetadata("CORE-1", "video", "2026-01-devlog")
+
+    assert result.ticket.metadata == {"video": "2026-01-devlog"}
+
+
+def testSetMetadataOnlyTouchesTheNamedKey(store: Store) -> None:
+    """
+    One consumer's key survives another consumer setting its own, since two skills may attach data to the same ticket.
+    """
+
+    store.create(key="CORE", title="Skirmish setup")
+    store.setMetadata("CORE-1", "video", "2026-01-devlog")
+
+    result: TicketResult = store.setMetadata("CORE-1", "reviewed", True)
+
+    assert result.ticket.metadata == {"video": "2026-01-devlog", "reviewed": True}
+
+
+def testSetMetadataWithNoneValueRemovesTheKey(store: Store) -> None:
+    """
+    A `None` value clears the entry rather than storing a null placeholder.
+    """
+
+    store.create(key="CORE", title="Skirmish setup")
+    store.setMetadata("CORE-1", "video", "2026-01-devlog")
+
+    result: TicketResult = store.setMetadata("CORE-1", "video", None)
+
+    assert result.ticket.metadata == {}
+
+
+def testSetMetadataRejectsAnEmptyKey(store: Store) -> None:
+    """
+    An empty key would be unreadable in the frontmatter, so it is refused at the boundary.
+    """
+
+    store.create(key="CORE", title="Skirmish setup")
+
+    with pytest.raises(EmptyValueError):
+        store.setMetadata("CORE-1", "  ", "value")
+
+
+def testSetMetadataRejectsAnUnknownId(store: Store) -> None:
+    """
+    Setting metadata on a ticket that does not exist is an error.
+    """
+
+    with pytest.raises(TicketNotFoundError):
+        store.setMetadata("CORE-99", "video", "x")
+
+
+def testSetMetadataPersistsAcrossALoad(store: Store) -> None:
+    """
+    The written value survives a fresh load, not just the in-memory ticket returned from the call.
+    """
+
+    store.create(key="CORE", title="Skirmish setup")
+    store.setMetadata("CORE-1", "video", "2026-01-devlog")
+
+    assert store.load("CORE-1").metadata == {"video": "2026-01-devlog"}
 
 
 def testSetStatusToDoneMovesTheFile(store: Store, config: Config) -> None:

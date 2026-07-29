@@ -40,7 +40,9 @@ Docket is this repository's ticket system. Tickets are markdown files with YAML 
 
 A ticket file has two halves with different rules. The body, everything below the closing frontmatter delimiter, is prose you may edit directly and freely. No tool parses it, and there is deliberately no tool for editing it. The frontmatter fields, and where the file lives, belong to these tools.
 
-So: use `update_ticket` for title, priority, and dependencies, and `set_status` for status. Never move a file between the todo and done directories by hand, because `set_status` writes the frontmatter and performs the move together. Never rename a ticket file, because filenames are frozen at creation and other tickets reference them.
+So: use `update_ticket` for title, priority, and dependencies, `set_metadata` for one metadata entry at a time, and `set_status` for status. Never move a file between the todo and done directories by hand, because `set_status` writes the frontmatter and performs the move together. Never rename a ticket file, because filenames are frozen at creation and other tickets reference them.
+
+`metadata` is a free-form map any tool or skill can attach entries to. Namespace your key so two consumers never collide, for example `video` rather than `covered`. `set_metadata` touches only the key you name, leaving every other consumer's entries alone.
 
 Dependencies are stored in one direction only. A ticket declares `requires`, and never declares what it blocks. `read_ticket` returns both directions, deriving the reverse side for you.
 
@@ -95,6 +97,7 @@ def readTicket(id: str) -> str:
     payload["body"] = ticket.body
     payload["requires"] = context["requires"]
     payload["requiredBy"] = context["requiredBy"]
+    payload["metadata"] = ticket.metadata
     payload["extra"] = ticket.extra
 
     return _json(payload)
@@ -150,6 +153,23 @@ def updateTicket(
     result: TicketResult = _store().update(ticketId=id, title=title, priority=priority, requires=requires)
 
     return _json({"id": result.ticket.id, "warnings": result.warnings, "ticket": result.ticket.summary()})
+
+
+@mcp.tool(name="set_metadata")
+def setMetadata(id: str, key: str, value: Optional[Any] = None) -> str:
+    """
+    Set or clear one entry in a ticket's `metadata` map.
+
+    `metadata` is free-form, shared by whatever tools or skills want to attach data to a ticket. Namespace your key, for example `video`, so your entries never collide with another consumer's. Only the named key is touched, every other entry is left as it was.
+
+    id: The ticket id.
+    key: The metadata key, which cannot be empty.
+    value: The value to store, any JSON-compatible type. Omit or pass null to remove the key instead.
+    """
+
+    result: TicketResult = _store().setMetadata(ticketId=id, key=key, value=value)
+
+    return _json({"id": result.ticket.id, "warnings": result.warnings, "metadata": result.ticket.metadata})
 
 
 @mcp.tool(name="set_status")
