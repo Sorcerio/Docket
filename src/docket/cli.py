@@ -212,6 +212,18 @@ def buildParser(config: Optional[Config] = None) -> argparse.ArgumentParser:
     statusParser.add_argument("id", help="The ticket id.")
     statusParser.add_argument("status", choices=STATUSES, help="The new status.")
 
+    metaParser: argparse.ArgumentParser = commands.add_parser("meta", help="Inspect and manage a ticket's metadata map.", formatter_class=RichHelpFormatter)
+    metaCommands = metaParser.add_subparsers(dest="metaCommand", metavar="SUBCOMMAND")
+
+    metaGetParser: argparse.ArgumentParser = metaCommands.add_parser("get", help="Show a ticket's metadata.", formatter_class=RichHelpFormatter)
+    metaGetParser.add_argument("id", help="The ticket id.")
+
+    metaSetParser: argparse.ArgumentParser = metaCommands.add_parser("set", help="Set or clear one metadata key.", formatter_class=RichHelpFormatter)
+    metaSetParser.add_argument("id", help="The ticket id.")
+    metaSetParser.add_argument("key", help="The metadata key. Namespace it, for example 'video', so it cannot collide with another tool's key.")
+    metaSetParser.add_argument("value", nargs="?", help="The value to store. Omit with -c/--clear to remove the key instead.")
+    metaSetParser.add_argument("-c", "--clear", action="store_true", help="Remove the key instead of setting it.")
+
     graphParser: argparse.ArgumentParser = commands.add_parser("graph", help="Render the dependency graph as mermaid source.", formatter_class=RichHelpFormatter)
     graphScope = graphParser.add_mutually_exclusive_group()
     graphScope.add_argument("-i", "--id", help="Scope to one ticket's ancestors and descendants.")
@@ -295,6 +307,7 @@ def dispatch(args: argparse.Namespace, config: Optional[Config], output: Output)
         "list": commandList,
         "set": commandSet,
         "status": commandStatus,
+        "meta": commandMeta,
         "graph": commandGraph,
         "key": commandKey,
         "validate": commandValidate,
@@ -445,6 +458,58 @@ def commandStatus(args: argparse.Namespace, store: Store, output: Output) -> int
     output.print(f"[bold]{ticket.id}[/bold] is now [{STATUS_STYLES.get(ticket.status, 'white')}]{ticket.status}[/] at {relativeToRoot(ticket.path, store.config.repoRoot)}")
 
     return EXIT_OK
+
+
+def commandMeta(args: argparse.Namespace, store: Store, output: Output) -> int:
+    """
+    Inspect and manage a ticket's metadata map.
+
+    args: The parsed arguments.
+    store: The store to read from or write through.
+    output: Where to write.
+
+    Returns the process exit code.
+    """
+
+    if args.metaCommand == "get":
+        ticket: Ticket = store.load(args.id)
+
+        if not ticket.metadata:
+            output.print("[dim]No metadata.[/dim]")
+            return EXIT_OK
+
+        table: Table = Table(box=None, pad_edge=False)
+        table.add_column("KEY", style="bold")
+        table.add_column("VALUE")
+
+        for key, value in ticket.metadata.items():
+            table.add_row(key, str(value))
+
+        output.print(table)
+
+        return EXIT_OK
+
+    if args.metaCommand == "set":
+        if args.clear and args.value is not None:
+            output.error("Cannot pass a value together with -c/--clear.")
+            return EXIT_USAGE
+
+        if not args.clear and args.value is None:
+            output.error("Nothing to set. Pass a value, or -c/--clear to remove the key.")
+            return EXIT_USAGE
+
+        result: TicketResult = store.setMetadata(ticketId=args.id, key=args.key, value=None if args.clear else args.value)
+
+        for warning in result.warnings:
+            output.warn(warning)
+
+        verb: str = "Cleared" if args.clear else "Set"
+        output.print(f"{verb} [bold]{args.key}[/bold] on [bold]{result.ticket.id}[/bold]")
+
+        return EXIT_OK
+
+    output.error("Expected one of: get, set.")
+    return EXIT_USAGE
 
 
 def commandGraph(args: argparse.Namespace, store: Store, output: Output) -> int:

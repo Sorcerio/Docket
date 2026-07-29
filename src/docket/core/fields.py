@@ -90,6 +90,35 @@ def readStringList(mapping: Mapping[str, Any], name: str, errorType: Type[Docket
     return [str(entry) for entry in value]
 
 
+def readDict(mapping: Mapping[str, Any], name: str, errorType: Type[DocketError], source: str) -> dict[str, Any]:
+    """
+    Read a mapping-of-strings-to-anything field.
+
+    An absent or null field reads as empty, for the same reason as `readStringList`.
+
+    mapping: The parsed mapping to read from.
+    name: The field name.
+    errorType: The exception raised when the field is of the wrong type.
+    source: What to name in the error message, for example `Frontmatter`.
+
+    Returns the field value.
+    """
+
+    if name not in mapping or mapping[name] is None:
+        return {}
+
+    value: Any = mapping[name]
+    if not isinstance(value, dict):
+        raise errorType(f"{source} field '{name}' must be a mapping, got {type(value).__name__}.")
+
+    # Reject a non-string key here, since every later stage treats these as named entries.
+    for entry in value:
+        if not isinstance(entry, str):
+            raise errorType(f"{source} field '{name}' must have only string keys, found {type(entry).__name__}.")
+
+    return dict(value)
+
+
 def _readRaw(mapping: Mapping[str, Any], name: str, errorType: Type[DocketError], source: str, fallback: Optional[Any]) -> Any:
     """
     Fetch a field, applying its fallback or raising when it is required and absent.
