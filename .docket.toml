@@ -12,6 +12,10 @@ doneDir = "done"
 defaultPriority = 2
 maxPriority = 4
 
+# How long, in seconds, one docket process waits for another to finish writing before giving up.
+# Writes are serialized across processes, so a CLI command and a running MCP server never overwrite each other.
+lockTimeout = 5.0
+
 # Keys group related work. A ticket id is <KEY>-<NUM>.
 # Add a key here with a short description of what it covers, or run `docket key add <KEY> "<DESCRIPTION>"`. A key must exist before tickets can use it.
 # An agent adds one through add_key, which it is told to do only after asking you first.

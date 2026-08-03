@@ -3,7 +3,7 @@ Docket Deploy
 
 Installing docket's data and configuration into a consumer repository.
 
-The consumer receives ticket directories, a `CLAUDE.md`, a `.docket.toml`, and one entry in `.mcp.json`. It never receives the tool's source.
+The consumer receives ticket directories, a `CLAUDE.md`, a `.docket.toml`, one entry in `.mcp.json`, and one entry in `.gitignore`. It never receives the tool's source.
 """
 
 # MARK: Imports
@@ -14,8 +14,10 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
+from docket.core.atomic import writeTextAtomic
 from docket.core.config import CONFIG_FILENAME, Config, loadConfig
 from docket.core.errors import DeployError
+from docket.core.lock import LOCK_FILENAME
 
 # MARK: Constants
 
@@ -26,6 +28,11 @@ TEMPLATE_CONFIG: str = "docket.toml"
 # What the consumer repository receives.
 CLAUDE_FILENAME: str = "CLAUDE.md"
 MCP_FILENAME: str = ".mcp.json"
+GITIGNORE_FILENAME: str = ".gitignore"
+
+# The lock file is machine state, so it is ignored rather than committed. The trailing wildcard covers the journal the lock's own storage may write beside it.
+LOCK_IGNORE_ENTRY: str = f"{LOCK_FILENAME}*"
+LOCK_IGNORE_COMMENT: str = "# Docket's cross-process lock. Machine state, never committed."
 
 # The key docket claims inside `.mcp.json`, and the console script it points at.
 MCP_SERVERS_KEY: str = "mcpServers"
@@ -112,6 +119,7 @@ def deploy(target: Path) -> DeployReport:
 
     _writeClaudeTemplate(config, report)
     _mergeMcpConfig(root, report)
+    _ignoreLockFile(root, report)
 
     return report
 
@@ -121,6 +129,7 @@ def upgrade(target: Path) -> DeployReport:
     Refresh the deployed templates in a consumer repository.
 
     This rewrites what docket owns and nothing else. The configuration is left alone because it holds the key registry, and tickets are left alone because they are the repository's data.
+    The `.gitignore` is the one file docket does not own but still appends to, since a repository deployed before the lock existed has no entry for it and would otherwise commit one.
 
     target: The repository root to upgrade.
 
@@ -141,6 +150,7 @@ def upgrade(target: Path) -> DeployReport:
 
     _writeClaudeTemplate(config, report)
     _mergeMcpConfig(root, report)
+    _ignoreLockFile(root, report)
 
     return report
 
@@ -212,6 +222,43 @@ def _mergeMcpConfig(root: Path, report: DeployReport) -> None:
     report.record(path, existed)
 
 
+def _ignoreLockFile(root: Path, report: DeployReport) -> None:
+    """
+    Ensure the repository's `.gitignore` covers docket's lock file.
+
+    The lock file is machine state rather than repository content, so committing it would put one developer's lock in another developer's checkout.
+    Only the entry is appended. Everything already in the file is preserved, and a file that already covers the lock is left exactly as it is.
+
+    root: The repository root.
+    report: The report to record the write against.
+    """
+
+    path: Path = root / GITIGNORE_FILENAME
+    existed: bool = path.exists()
+
+    lines: list[str] = []
+    if existed:
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError as error:
+            raise DeployError(f"Could not read {path}: {error}") from error
+
+    # An entry already present means there is nothing to do, and rewriting the file to say so would only churn it.
+    if any(line.strip() == LOCK_IGNORE_ENTRY for line in lines):
+        report.skipped.append(path)
+
+        return
+
+    # Separate the entry from whatever came before it, so it does not land on the end of an existing line or crowd an unrelated block.
+    if lines and lines[-1].strip():
+        lines.append("")
+
+    lines.extend([LOCK_IGNORE_COMMENT, LOCK_IGNORE_ENTRY])
+
+    _write(path, "\n".join(lines) + "\n")
+    report.record(path, existed)
+
+
 def _requireDirectory(target: Path) -> Path:
     """
     Resolve a deploy target, refusing anything that is not an existing directory.
@@ -233,11 +280,9 @@ def _write(path: Path, text: str) -> None:
     """
     Write a file, creating its parent directories.
 
-    LF is written explicitly so a Windows checkout does not churn the file.
-
     path: Where to write.
     text: What to write.
     """
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8", newline="\n")
+    writeTextAtomic(path, text)

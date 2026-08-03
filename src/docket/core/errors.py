@@ -105,6 +105,14 @@ class OutputPathError(DocketError):
     """
 
 
+class LockTimeoutError(DocketError):
+    """
+    Raised when another docket process held the repository lock for longer than the configured `lockTimeout`.
+
+    Nothing was written when this is raised, so retrying the same call is always safe.
+    """
+
+
 class TicketParseError(DocketError):
     """
     Raised when a file under the ticket root is not a readable ticket.

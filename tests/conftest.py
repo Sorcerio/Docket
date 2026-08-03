@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from docket.core.config import Config, loadConfig
+from docket.core.store import Store
 
 # MARK: Constants
 
@@ -69,3 +70,16 @@ def config(repoDir: Path) -> Config:
     """
 
     return loadConfig(repoDir / ".docket.toml")
+
+
+@pytest.fixture
+def store(config: Config) -> Store:
+    """
+    Build a store over a throwaway repository.
+
+    config: The configuration fixture.
+
+    Returns the store.
+    """
+
+    return Store(config)

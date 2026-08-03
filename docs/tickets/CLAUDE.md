@@ -95,6 +95,12 @@ A ticket is read weeks later by someone, or something, with none of the context 
 
 Include the architecture that was discussed, the assumptions being made, and the questions that were already asked and answered. State them plainly in the body, where a new reader will see them. A ticket that only makes sense to whoever was in the conversation is a ticket that will be redone from scratch.
 
+## If a call reports the repository is locked
+
+Another process was writing to this repository and did not finish in time.
+
+Nothing was changed when that error is raised, so retry the same call once. If it happens repeatedly, tell the user rather than retrying in a loop, because something is holding the repository open.
+
 ## After writing a batch
 
 Call `validate`.

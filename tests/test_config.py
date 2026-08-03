@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from docket.core.config import Config, discoverConfig, findConfigPath, loadConfig
+from docket.core.config import DEFAULT_LOCK_TIMEOUT, Config, discoverConfig, findConfigPath, loadConfig
 from docket.core.errors import ConfigError, ConfigNotFoundError, InvalidKeyError, UnknownKeyError
 
 # MARK: Functions
@@ -90,6 +90,66 @@ def testADefaultPriorityAboveTheCeilingIsRejected(tmp_path: Path) -> None:
 
     configPath: Path = tmp_path / ".docket.toml"
     configPath.write_text("defaultPriority = 9\nmaxPriority = 4\n", encoding="utf-8", newline="\n")
+
+    with pytest.raises(ConfigError):
+        loadConfig(configPath)
+
+
+def testAnAbsentLockTimeoutFallsBackToTheDefault(tmp_path: Path) -> None:
+    """
+    A repository deployed before the lock existed carries no `lockTimeout`, and must keep loading.
+    """
+
+    configPath: Path = tmp_path / ".docket.toml"
+    configPath.write_text('root = "docs/tickets"\n', encoding="utf-8", newline="\n")
+
+    assert loadConfig(configPath).lockTimeout == DEFAULT_LOCK_TIMEOUT
+
+
+def testALockTimeoutIsReadAsAFloat(tmp_path: Path) -> None:
+    """
+    The wait is in seconds and fractions of one are meaningful, so the field is not an integer.
+    """
+
+    configPath: Path = tmp_path / ".docket.toml"
+    configPath.write_text("lockTimeout = 0.25\n", encoding="utf-8", newline="\n")
+
+    assert loadConfig(configPath).lockTimeout == 0.25
+
+
+def testAWholeNumberLockTimeoutIsAccepted(tmp_path: Path) -> None:
+    """
+    Writing `5` rather than `5.0` means the same thing, so it is widened rather than refused.
+    """
+
+    configPath: Path = tmp_path / ".docket.toml"
+    configPath.write_text("lockTimeout = 5\n", encoding="utf-8", newline="\n")
+
+    assert loadConfig(configPath).lockTimeout == 5.0
+
+
+def testABooleanIsNotAcceptedAsALockTimeout(tmp_path: Path) -> None:
+    """
+    `bool` subclasses `int`, so `true` must be refused rather than read as a one second wait.
+    """
+
+    configPath: Path = tmp_path / ".docket.toml"
+    configPath.write_text("lockTimeout = true\n", encoding="utf-8", newline="\n")
+
+    with pytest.raises(ConfigError):
+        loadConfig(configPath)
+
+
+@pytest.mark.parametrize("timeout", ["0", "-1.5"])
+def testALockTimeoutOfZeroOrLessIsRejected(tmp_path: Path, timeout: str) -> None:
+    """
+    A timeout that cannot be waited out would fail every operation that ever met contention, so it is never what the writer meant.
+
+    timeout: The rejected value, written into the configuration.
+    """
+
+    configPath: Path = tmp_path / ".docket.toml"
+    configPath.write_text(f"lockTimeout = {timeout}\n", encoding="utf-8", newline="\n")
 
     with pytest.raises(ConfigError):
         loadConfig(configPath)

@@ -7,15 +7,17 @@ Reading and writing `.docket.toml`, including the key registry.
 # MARK: Imports
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, ContextManager, Optional
 
 import tomlkit
 from tomlkit import TOMLDocument
 from tomlkit.items import Comment, Table
 
+from docket.core.atomic import writeTextAtomic
 from docket.core.errors import ConfigError, ConfigNotFoundError, InvalidKeyError, UnknownKeyError
-from docket.core.fields import readInt, readString
+from docket.core.fields import readFloat, readInt, readString
 from docket.core.ids import requireValidKey
+from docket.core.lock import exclusiveLock, sharedLock
 from docket.core.inputs import requireText
 
 # MARK: Constants
@@ -32,6 +34,7 @@ DEFAULT_TODO_DIR: str = "todo"
 DEFAULT_DONE_DIR: str = "done"
 DEFAULT_PRIORITY: int = 2
 DEFAULT_MAX_PRIORITY: int = 4
+DEFAULT_LOCK_TIMEOUT: float = 5.0
 
 # MARK: Classes
 
@@ -65,10 +68,15 @@ class Config:
         self.doneDir: str = readString(document, "doneDir", ConfigError, source, DEFAULT_DONE_DIR)
         self.defaultPriority: int = readInt(document, "defaultPriority", ConfigError, source, DEFAULT_PRIORITY)
         self.maxPriority: int = readInt(document, "maxPriority", ConfigError, source, DEFAULT_MAX_PRIORITY)
+        self.lockTimeout: float = readFloat(document, "lockTimeout", ConfigError, source, DEFAULT_LOCK_TIMEOUT)
 
         # A default outside the allowed band would make every created ticket invalid, so catch it at load.
         if not 0 <= self.defaultPriority <= self.maxPriority:
             raise ConfigError(f"defaultPriority {self.defaultPriority} is outside 0 through maxPriority {self.maxPriority} in {self.path}.")
+
+        # A timeout of zero or less would fail every operation that ever met contention, so it is never what the writer meant.
+        if self.lockTimeout <= 0:
+            raise ConfigError(f"lockTimeout {self.lockTimeout} in {self.path} must be greater than 0. It is a wait in seconds.")
 
     # MARK: Properties
 
@@ -114,6 +122,15 @@ class Config:
         return {name: str(value) for name, value in self.__keysTable().items() if not isinstance(value, dict)}
 
     # MARK: Private Functions
+
+    def __reload(self) -> None:
+        """
+        Re-read the document from disk, discarding the copy held in memory.
+
+        Only the document is refreshed. The scalar fields are left as they were read at load, since the callers of this are editing `[keys]` and a configuration that changed its own root mid-operation would be a stranger problem than the one this solves.
+        """
+
+        self.document = _parseDocument(self.path)
 
     def __keysTable(self) -> Table:
         """
@@ -178,6 +195,24 @@ class Config:
 
     # MARK: Functions
 
+    def sharedLock(self) -> ContextManager[None]:
+        """
+        Hold this repository's read lock, waiting no longer than the configured `lockTimeout`.
+
+        Returns the context manager to hold for the duration of the read.
+        """
+
+        return sharedLock(self.repoRoot, self.lockTimeout)
+
+    def exclusiveLock(self) -> ContextManager[None]:
+        """
+        Hold this repository's write lock, waiting no longer than the configured `lockTimeout`.
+
+        Returns the context manager to hold for the duration of the read-modify-write.
+        """
+
+        return exclusiveLock(self.repoRoot, self.lockTimeout)
+
     def isRegisteredKey(self, key: str) -> bool:
         """
         Report whether a key has been approved.
@@ -224,18 +259,22 @@ class Config:
         # The description is the only thing telling a later reader what the key groups, so an empty one defeats the point of registering it.
         requireText(description, "key description")
 
-        # A key that already exists is not an addition, it is a mistake worth naming.
-        if self.isRegisteredKey(key):
-            raise InvalidKeyError(f"Key '{key}' is already registered.")
+        with self.exclusiveLock():
+            # The document may have been parsed long before this call, so re-read it inside the lock. Adding to a stale copy and writing the whole file back would drop whatever another process registered in the meantime, which is the exact loss the lock exists to prevent.
+            self.__reload()
 
-        table: Table = self.__keysTable()
+            # A key that already exists is not an addition, it is a mistake worth naming.
+            if self.isRegisteredKey(key):
+                raise InvalidKeyError(f"Key '{key}' is already registered.")
 
-        # Write the rationale first, so it lands on the line above the key rather than beside it.
-        if rationale:
-            table.add(tomlkit.comment(rationale))
+            table: Table = self.__keysTable()
 
-        table[key] = description
-        self.save()
+            # Write the rationale first, so it lands on the line above the key rather than beside it.
+            if rationale:
+                table.add(tomlkit.comment(rationale))
+
+            table[key] = description
+            self.save()
 
         return key
 
@@ -249,25 +288,29 @@ class Config:
         usedBy: Ids of tickets currently carrying the key, if any.
         """
 
-        if not self.isRegisteredKey(key):
-            raise UnknownKeyError(f"Key '{key}' is not registered, so there is nothing to remove.")
-
         # Refuse while tickets depend on the key, and name them so the user can act.
         if usedBy:
             raise InvalidKeyError(f"Key '{key}' cannot be removed because {len(usedBy)} ticket(s) use it: {', '.join(sorted(usedBy))}.")
 
-        # Take the rationale comment with it, since a comment explaining a key that no longer exists only misleads.
-        self.__dropFromKeysTable(key)
+        with self.exclusiveLock():
+            # Re-read inside the lock for the same reason as `addKey`, since this also rewrites the whole file.
+            self.__reload()
 
-        self.save()
+            if not self.isRegisteredKey(key):
+                raise UnknownKeyError(f"Key '{key}' is not registered, so there is nothing to remove.")
+
+            # Take the rationale comment with it, since a comment explaining a key that no longer exists only misleads.
+            self.__dropFromKeysTable(key)
+
+            self.save()
 
     def save(self) -> None:
         """
         Write the document back to disk, preserving comments, spacing, and key order.
         """
 
-        # Write LF newlines explicitly so a checkout on Windows does not churn the file.
-        self.path.write_text(tomlkit.dumps(self.document), encoding="utf-8", newline="\n")
+        # Replace the file in one step, so a concurrent reader sees either the old configuration or the new one and never a truncated file.
+        writeTextAtomic(self.path, tomlkit.dumps(self.document))
 
 
 # MARK: Functions
@@ -311,14 +354,24 @@ def loadConfig(configPath: Path) -> Config:
     Returns the loaded `Config`.
     """
 
+    return Config(path=configPath, document=_parseDocument(configPath))
+
+
+def _parseDocument(configPath: Path) -> TOMLDocument:
+    """
+    Read and parse a configuration file into a round-trippable document.
+
+    configPath: The path to read.
+
+    Returns the parsed document.
+    """
+
     try:
-        document: TOMLDocument = tomlkit.parse(configPath.read_text(encoding="utf-8"))
+        return tomlkit.parse(configPath.read_text(encoding="utf-8"))
     except OSError as error:
         raise ConfigError(f"Could not read {configPath}: {error}") from error
     except Exception as error:
         raise ConfigError(f"Could not parse {configPath}: {error}") from error
-
-    return Config(path=configPath, document=document)
 
 
 def discoverConfig(startDir: Optional[Path] = None) -> Config:

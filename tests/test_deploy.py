@@ -1,7 +1,7 @@
 """
 Deploy Tests
 
-Cover the four deploy steps, idempotency, the `.mcp.json` merge, and what upgrade refuses to touch.
+Cover the five deploy steps, idempotency, the `.mcp.json` merge, the ignore entry, and what upgrade refuses to touch.
 """
 
 # MARK: Imports
@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 
 from docket.core.config import Config, loadConfig
-from docket.core.deploy import DeployReport, deploy, readTemplate, upgrade
+from docket.core.deploy import LOCK_IGNORE_ENTRY, DeployReport, deploy, readTemplate, upgrade
 from docket.core.errors import DeployError
 
 # MARK: Functions
@@ -31,9 +31,9 @@ def readMcp(root: Path) -> dict[str, Any]:
     return json.loads((root / ".mcp.json").read_text(encoding="utf-8"))
 
 
-def testDeployPerformsAllFourSteps(tmp_path: Path) -> None:
+def testDeployPerformsAllFiveSteps(tmp_path: Path) -> None:
     """
-    A fresh repository receives the ticket directories, the instructions, the configuration, and the server entry.
+    A fresh repository receives the ticket directories, the instructions, the configuration, the server entry, and the ignore entry.
     """
 
     deploy(tmp_path)
@@ -43,6 +43,79 @@ def testDeployPerformsAllFourSteps(tmp_path: Path) -> None:
     assert (tmp_path / "docs" / "tickets" / "done").is_dir()
     assert (tmp_path / "docs" / "tickets" / "CLAUDE.md").is_file()
     assert (tmp_path / ".mcp.json").is_file()
+    assert (tmp_path / ".gitignore").is_file()
+
+
+def testDeployIgnoresTheLockFile(tmp_path: Path) -> None:
+    """
+    The lock is machine state, so committing it would put one developer's lock in another's checkout.
+    """
+
+    deploy(tmp_path)
+
+    assert LOCK_IGNORE_ENTRY in (tmp_path / ".gitignore").read_text(encoding="utf-8").splitlines()
+
+
+def testDeployPreservesAnExistingIgnoreFile(tmp_path: Path) -> None:
+    """
+    The ignore file belongs to the repository, not to docket, so nothing already in it may be disturbed.
+    """
+
+    path: Path = tmp_path / ".gitignore"
+    path.write_text("__pycache__/\n*.egg-info\n", encoding="utf-8", newline="\n")
+
+    deploy(tmp_path)
+
+    lines: list[str] = path.read_text(encoding="utf-8").splitlines()
+
+    assert lines[:2] == ["__pycache__/", "*.egg-info"]
+    assert LOCK_IGNORE_ENTRY in lines
+
+
+def testDeployDoesNotRepeatTheIgnoreEntry(tmp_path: Path) -> None:
+    """
+    Deploy is idempotent, and an entry already present is left exactly as it is rather than appended again.
+    """
+
+    deploy(tmp_path)
+    first: str = (tmp_path / ".gitignore").read_text(encoding="utf-8")
+
+    report: DeployReport = deploy(tmp_path)
+
+    assert (tmp_path / ".gitignore").read_text(encoding="utf-8") == first
+    assert tmp_path / ".gitignore" in report.skipped
+
+
+def testDeployDoesNotJoinTheEntryOntoAnUnterminatedLine(tmp_path: Path) -> None:
+    """
+    An ignore file whose last line has no newline must not end up with the entry stuck to the end of it.
+    """
+
+    path: Path = tmp_path / ".gitignore"
+    path.write_text("build/", encoding="utf-8", newline="\n")
+
+    deploy(tmp_path)
+
+    lines: list[str] = path.read_text(encoding="utf-8").splitlines()
+
+    assert "build/" in lines
+    assert LOCK_IGNORE_ENTRY in lines
+
+
+def testUpgradeAddsTheIgnoreEntryToAnOlderDeployment(tmp_path: Path) -> None:
+    """
+    A repository deployed before the lock existed has no entry, and would otherwise commit its lock file.
+    """
+
+    deploy(tmp_path)
+
+    # Put the ignore file back the way a pre-lock deployment left it, which is without the entry.
+    path: Path = tmp_path / ".gitignore"
+    path.write_text("__pycache__/\n", encoding="utf-8", newline="\n")
+
+    upgrade(tmp_path)
+
+    assert LOCK_IGNORE_ENTRY in path.read_text(encoding="utf-8").splitlines()
 
 
 def testDeployedConfigurationHasAnEmptyKeyRegistry(tmp_path: Path) -> None:

@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator, Optional
 
+from docket.core.atomic import writeTextAtomic
 from docket.core.config import Config
 from docket.core.errors import ConflictingArgumentsError, InvalidPriorityError, InvalidStatusError, TicketNotFoundError, TicketParseError
 from docket.core.ids import buildFilename, nextId, parseId, requireValidKey
@@ -235,31 +236,14 @@ class Store:
 
     def loadAll(self) -> TicketSet:
         """
-        Load every ticket under the configured root.
-
-        A file that cannot be read is collected rather than raised, so one broken ticket does not hide the rest and `validate` can report it.
+        Load every ticket under the configured root, holding the repository's read lock while doing so.
 
         Returns the loaded `TicketSet`.
         """
 
-        result: TicketSet = TicketSet()
-
-        for path in self.discoverPaths():
-            try:
-                ticket: Ticket = parseTicket(path.read_text(encoding="utf-8"), path=path)
-            except (TicketParseError, OSError, UnicodeDecodeError) as error:
-                result.failures.append(LoadFailure(path=path, message=str(error)))
-                continue
-
-            # Keep the first file claiming an id and record the rest, so a merge collision is reported instead of silently overwriting.
-            existing: Optional[Ticket] = result.tickets.get(ticket.id)
-            if existing is not None:
-                result.duplicates.append(DuplicateId(id=ticket.id, path=path, existingPath=existing.path or path))
-                continue
-
-            result.tickets[ticket.id] = ticket
-
-        return result
+        # A caller already inside a write lock must not come through here, since the lock refuses to downgrade from writing to reading. Those callers use the unlocked form directly.
+        with self.config.sharedLock():
+            return self.__loadAllUnlocked()
 
     def load(self, ticketId: str) -> Ticket:
         """
@@ -288,8 +272,8 @@ class Store:
         # A freshly deployed repository may not have the status directories yet.
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Write LF explicitly so the file does not churn on a Windows checkout.
-        path.write_text(serializeTicket(ticket), encoding="utf-8", newline="\n")
+        # Replace the file in one step, so a concurrent reader sees either the old ticket or the new one and never a truncated file.
+        writeTextAtomic(path, serializeTicket(ticket))
         ticket.path = path
 
         return ticket
@@ -304,6 +288,8 @@ class Store:
     ) -> TicketResult:
         """
         Allocate an id and write a new ticket.
+
+        The id is derived by scanning what already exists, so the scan and the write are held together under one lock. Without that, two processes minting under one key read the same set and allocate the same number.
 
         key: The key to mint under, which must be registered.
         title: The ticket title, which the filename slug derives from once, here.
@@ -321,21 +307,22 @@ class Store:
         requireValidKey(key)
         self.config.requireKnownKey(key)
 
-        existing: TicketSet = self.loadAll()
+        with self.config.exclusiveLock():
+            existing: TicketSet = self.__loadAllUnlocked()
 
-        resolvedPriority: int = priority if priority is not None else self.config.defaultPriority
-        self.__requireValidPriority(resolvedPriority)
+            resolvedPriority: int = priority if priority is not None else self.config.defaultPriority
+            self.__requireValidPriority(resolvedPriority)
 
-        ticket: Ticket = Ticket(
-            id=nextId(key, existing.ids()),
-            title=title,
-            status=STATUSES[0],
-            priority=resolvedPriority,
-            requires=list(requires or []),
-            body=buildBody(title, body),
-        )
+            ticket: Ticket = Ticket(
+                id=nextId(key, existing.ids()),
+                title=title,
+                status=STATUSES[0],
+                priority=resolvedPriority,
+                requires=list(requires or []),
+                body=buildBody(title, body),
+            )
 
-        return TicketResult(ticket=self.write(ticket), warnings=self.__danglingWarnings(ticket, existing))
+            return TicketResult(ticket=self.write(ticket), warnings=self.__danglingWarnings(ticket, existing))
 
     def update(
         self,
@@ -353,6 +340,8 @@ class Store:
 
         The dependency list is edited either wholesale or in place, never both in one call. `requires` replaces it. `requiresAdd` and `requiresRemove` edit whatever is already there, which is what spares a caller from retyping a long list to change one entry.
 
+        The load and the write back are held together under one lock, since a second process changing a different field in the gap would have its change reverted by this write.
+
         ticketId: The ticket to change.
         title: A new title, if any.
         priority: A new priority, if any.
@@ -367,37 +356,40 @@ class Store:
         if requires is not None and (requiresAdd is not None or requiresRemove is not None):
             raise ConflictingArgumentsError("A replacement dependency list cannot be combined with adding to or removing from the existing one. Pass either the replacement or the edits.")
 
-        existing: TicketSet = self.loadAll()
-        ticket: Ticket = existing.get(ticketId)
+        with self.config.exclusiveLock():
+            existing: TicketSet = self.__loadAllUnlocked()
+            ticket: Ticket = existing.get(ticketId)
 
-        if title is not None:
-            ticket.title = requireText(title, "title")
+            if title is not None:
+                ticket.title = requireText(title, "title")
 
-        if priority is not None:
-            self.__requireValidPriority(priority)
-            ticket.priority = priority
+            if priority is not None:
+                self.__requireValidPriority(priority)
+                ticket.priority = priority
 
-        if requires is not None:
-            ticket.requires = list(requires)
+            if requires is not None:
+                ticket.requires = list(requires)
 
-        # Removal runs first, so passing the same id to both ends with it present rather than gone.
-        if requiresRemove is not None:
-            dropped: set[str] = set(requiresRemove)
-            ticket.requires = [required for required in ticket.requires if required not in dropped]
+            # Removal runs first, so passing the same id to both ends with it present rather than gone.
+            if requiresRemove is not None:
+                dropped: set[str] = set(requiresRemove)
+                ticket.requires = [required for required in ticket.requires if required not in dropped]
 
-        # New ids append in the order given, and one already present is left where it is rather than duplicated.
-        if requiresAdd is not None:
-            for required in requiresAdd:
-                if required not in ticket.requires:
-                    ticket.requires.append(required)
+            # New ids append in the order given, and one already present is left where it is rather than duplicated.
+            if requiresAdd is not None:
+                for required in requiresAdd:
+                    if required not in ticket.requires:
+                        ticket.requires.append(required)
 
-        return TicketResult(ticket=self.write(ticket), warnings=self.__danglingWarnings(ticket, existing))
+            return TicketResult(ticket=self.write(ticket), warnings=self.__danglingWarnings(ticket, existing))
 
     def setMetadata(self, ticketId: str, key: str, value: Optional[Any]) -> TicketResult:
         """
         Set or clear one entry in a ticket's `metadata` map.
 
         Only the named entry is touched, so one consumer's key survives another consumer writing its own. `value` of `None` removes the entry rather than storing a null, keeping the map free of placeholders nothing reads.
+
+        The whole file is rewritten to change the one entry, so the load and the write back are held together under one lock. Two consumers namespacing their keys correctly would still lose one of the two without it.
 
         ticketId: The ticket to change.
         key: The metadata key, which cannot be empty.
@@ -408,21 +400,24 @@ class Store:
 
         requireText(key, "metadata key")
 
-        existing: TicketSet = self.loadAll()
-        ticket: Ticket = existing.get(ticketId)
+        with self.config.exclusiveLock():
+            existing: TicketSet = self.__loadAllUnlocked()
+            ticket: Ticket = existing.get(ticketId)
 
-        if value is None:
-            ticket.metadata.pop(key, None)
-        else:
-            ticket.metadata[key] = value
+            if value is None:
+                ticket.metadata.pop(key, None)
+            else:
+                ticket.metadata[key] = value
 
-        return TicketResult(ticket=self.write(ticket), warnings=self.__danglingWarnings(ticket, existing))
+            return TicketResult(ticket=self.write(ticket), warnings=self.__danglingWarnings(ticket, existing))
 
     def setStatus(self, ticketId: str, status: str) -> Ticket:
         """
         Change a ticket's status and move its file in the same operation.
 
         The frontmatter is the truth and the directory is a projection of it, so neither is ever written without the other.
+
+        The move is a write followed by a delete, which is two steps no matter how each one is performed, so the lock is what stops a reader from seeing both files at once and reporting a duplicate id.
 
         ticketId: The ticket to change.
         status: The new status.
@@ -434,17 +429,18 @@ class Store:
         if status not in STATUSES:
             raise InvalidStatusError(f"Status '{status}' is not one of {', '.join(STATUSES)}.")
 
-        ticket: Ticket = self.load(ticketId)
-        previousPath: Optional[Path] = ticket.path
+        with self.config.exclusiveLock():
+            ticket: Ticket = self.__loadAllUnlocked().get(ticketId)
+            previousPath: Optional[Path] = ticket.path
 
-        ticket.status = status
-        self.write(ticket)
+            ticket.status = status
+            self.write(ticket)
 
-        # Remove the old file only once the new one is on disk, and only when the move actually crossed directories.
-        if previousPath is not None and previousPath != ticket.path and previousPath.exists():
-            previousPath.unlink()
+            # Remove the old file only once the new one is on disk, and only when the move actually crossed directories.
+            if previousPath is not None and previousPath != ticket.path and previousPath.exists():
+                previousPath.unlink()
 
-        return ticket
+            return ticket
 
     def usedKeys(self) -> dict[str, list[str]]:
         """
@@ -462,6 +458,36 @@ class Store:
         return used
 
     # MARK: Private Functions
+
+    def __loadAllUnlocked(self) -> TicketSet:
+        """
+        Load every ticket under the configured root without taking any lock.
+
+        A file that cannot be read is collected rather than raised, so one broken ticket does not hide the rest and `validate` can report it.
+
+        This exists because the lock refuses to downgrade from writing to reading, so a mutator already holding the write lock cannot call `loadAll`. Every caller of this is either inside a write lock or is `loadAll` itself.
+
+        Returns the loaded `TicketSet`.
+        """
+
+        result: TicketSet = TicketSet()
+
+        for path in self.discoverPaths():
+            try:
+                ticket: Ticket = parseTicket(path.read_text(encoding="utf-8"), path=path)
+            except (TicketParseError, OSError, UnicodeDecodeError) as error:
+                result.failures.append(LoadFailure(path=path, message=str(error)))
+                continue
+
+            # Keep the first file claiming an id and record the rest, so a merge collision is reported instead of silently overwriting.
+            existing: Optional[Ticket] = result.tickets.get(ticket.id)
+            if existing is not None:
+                result.duplicates.append(DuplicateId(id=ticket.id, path=path, existingPath=existing.path or path))
+                continue
+
+            result.tickets[ticket.id] = ticket
+
+        return result
 
     def __requireValidPriority(self, priority: int) -> None:
         """
