@@ -1,7 +1,7 @@
 ---
 id: BUG-5
 title: Serialize ticket writes across processes
-status: todo
+status: done
 priority: 3
 requires: []
 metadata: {}
