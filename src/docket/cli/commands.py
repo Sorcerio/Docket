@@ -14,7 +14,7 @@ from pathlib import Path
 from rich.table import Table
 from rich.text import Text
 
-from docket.cli.grammar import EXIT_INVALID, EXIT_OK, EXIT_USAGE, OUT_ARGUMENT, parseEditIdList, parseIdList
+from docket.cli.grammar import EXIT_INVALID, EXIT_OK, EXIT_USAGE, OUT_ARGUMENT, parseEditIdList, parseIdList, resolveGraphScope, resolveListFilters
 from docket.cli.output import STATUS_STYLES, Output, buildContextTable, relativeToRoot
 from docket.core.config import Config
 from docket.core.deploy import DeployReport, deploy, upgrade
@@ -22,10 +22,38 @@ from docket.core.graph import ResolvedGraph, dependencyContext, resolveGraph, su
 from docket.core.inputs import requireWritableFile, writeFile
 from docket.core.mermaid import renderGraph
 from docket.core.store import Store, TicketResult, TicketSet
-from docket.core.ticket import Ticket
+from docket.core.ticket import STATUSES, Ticket
 from docket.core.validate import SEVERITY_ERROR, ValidationReport, validate
 
 # MARK: Functions
+
+
+def commandTicket(args: argparse.Namespace, store: Store, output: Output) -> int:
+    """
+    Route one ticket's command to the handler for it.
+
+    A bare id shows the ticket, since showing it is what naming one almost always means.
+
+    args: The parsed arguments.
+    store: The store to read from or write through.
+    output: Where to write.
+
+    Returns the process exit code.
+    """
+
+    # A status word is not a command carrying a value, it is the whole instruction.
+    if args.ticketCommand in STATUSES:
+        return commandStatus(args, store, output)
+
+    handlers = {
+        None: commandShow,
+        "show": commandShow,
+        "status": commandStatusRead,
+        "set": commandSet,
+        "meta": commandMeta,
+    }
+
+    return handlers[args.ticketCommand](args, store, output)
 
 
 def commandNew(args: argparse.Namespace, store: Store, output: Output) -> int:
@@ -99,11 +127,13 @@ def commandList(args: argparse.Namespace, store: Store, output: Output) -> int:
     Returns the process exit code.
     """
 
-    # An unregistered key cannot match a ticket, so name it rather than reporting an empty result the user would read as "no work here".
-    if args.key is not None:
-        store.config.requireKnownKey(args.key)
+    status, key, priorityMax = resolveListFilters(args.filters, args.status, args.key, args.priorityMax)
 
-    tickets: list[Ticket] = store.loadAll().filtered(status=args.status, key=args.key, priorityMax=args.priorityMax)
+    # An unregistered key cannot match a ticket, so name it rather than reporting an empty result the user would read as "no work here".
+    if key is not None:
+        store.config.requireKnownKey(key)
+
+    tickets: list[Ticket] = store.loadAll().filtered(status=status, key=key, priorityMax=priorityMax)
 
     if not tickets:
         output.print("[dim]No tickets matched.[/dim]")
@@ -167,9 +197,30 @@ def commandStatus(args: argparse.Namespace, store: Store, output: Output) -> int
     Returns the process exit code.
     """
 
-    ticket: Ticket = store.setStatus(args.id, args.status)
+    # The command that was typed is the status, since each status is its own command rather than a value handed to a shared one.
+    ticket: Ticket = store.setStatus(args.id, args.ticketCommand)
 
     output.print(f"[bold]{ticket.id}[/bold] is now [{STATUS_STYLES.get(ticket.status, 'white')}]{ticket.status}[/] at {relativeToRoot(ticket.path, store.config.repoRoot)}")
+
+    return EXIT_OK
+
+
+def commandStatusRead(args: argparse.Namespace, store: Store, output: Output) -> int:
+    """
+    Print a ticket's status and nothing else.
+
+    This goes out raw, with no styling and no surrounding words, so a shell can read the answer as easily as a person can.
+
+    args: The parsed arguments.
+    store: The store to read from.
+    output: Where to write.
+
+    Returns the process exit code.
+    """
+
+    ticket: Ticket = store.load(args.id)
+
+    output.raw(f"{ticket.status}\n")
 
     return EXIT_OK
 
@@ -178,6 +229,8 @@ def commandMeta(args: argparse.Namespace, store: Store, output: Output) -> int:
     """
     Inspect and manage a ticket's metadata map.
 
+    How much of the call was typed is what it means. No key reads the whole map, a key alone reads that one entry, and a key with a value writes it, which is the same shape a status has.
+
     args: The parsed arguments.
     store: The store to read from or write through.
     output: Where to write.
@@ -185,7 +238,12 @@ def commandMeta(args: argparse.Namespace, store: Store, output: Output) -> int:
     Returns the process exit code.
     """
 
-    if args.metaCommand == "get":
+    if args.key is None:
+        # Clearing needs to know what to clear, and the whole map is not it.
+        if args.clear:
+            output.error("Nothing to clear. Name the metadata key to remove.")
+            return EXIT_USAGE
+
         ticket: Ticket = store.load(args.id)
 
         if not ticket.metadata:
@@ -203,27 +261,31 @@ def commandMeta(args: argparse.Namespace, store: Store, output: Output) -> int:
 
         return EXIT_OK
 
-    if args.metaCommand == "set":
-        if args.clear and args.value is not None:
-            output.error("Cannot pass a value together with -c/--clear.")
+    if args.clear and args.value is not None:
+        output.error("Cannot pass a value together with -c/--clear.")
+        return EXIT_USAGE
+
+    # A key with no value reads that entry, raw, for the same reason `status` does.
+    if not args.clear and args.value is None:
+        ticket = store.load(args.id)
+
+        if args.key not in ticket.metadata:
+            output.error(f"'{args.key}' is not set on {ticket.id}.")
             return EXIT_USAGE
 
-        if not args.clear and args.value is None:
-            output.error("Nothing to set. Pass a value, or -c/--clear to remove the key.")
-            return EXIT_USAGE
-
-        result: TicketResult = store.setMetadata(ticketId=args.id, key=args.key, value=None if args.clear else args.value)
-
-        for warning in result.warnings:
-            output.warn(warning)
-
-        verb: str = "Cleared" if args.clear else "Set"
-        output.print(f"{verb} [bold]{args.key}[/bold] on [bold]{result.ticket.id}[/bold]")
+        output.raw(f"{ticket.metadata[args.key]}\n")
 
         return EXIT_OK
 
-    output.error("Expected one of: get, set.")
-    return EXIT_USAGE
+    result: TicketResult = store.setMetadata(ticketId=args.id, key=args.key, value=None if args.clear else args.value)
+
+    for warning in result.warnings:
+        output.warn(warning)
+
+    verb: str = "Cleared" if args.clear else "Set"
+    output.print(f"{verb} [bold]{args.key}[/bold] on [bold]{result.ticket.id}[/bold]")
+
+    return EXIT_OK
 
 
 def commandGraph(args: argparse.Namespace, store: Store, output: Output) -> int:
@@ -237,15 +299,17 @@ def commandGraph(args: argparse.Namespace, store: Store, output: Output) -> int:
     Returns the process exit code.
     """
 
+    ticketId, key = resolveGraphScope(args.scope, args.id, args.key)
+
     graph: ResolvedGraph = resolveGraph(store.loadAll())
 
-    # Scope the graph when asked. The two scopes are mutually exclusive at the parser.
-    if args.id is not None:
-        graph = subgraphForId(graph, args.id)
-    elif args.key is not None:
+    # Scope the graph when asked. At most one of the two survives resolution.
+    if ticketId is not None:
+        graph = subgraphForId(graph, ticketId)
+    elif key is not None:
         # For the same reason as `list`, an unregistered key here would render an empty graph rather than admitting the key does not exist.
-        store.config.requireKnownKey(args.key)
-        graph = subgraphForKey(graph, args.key)
+        store.config.requireKnownKey(key)
+        graph = subgraphForKey(graph, key)
 
     source: str = renderGraph(graph)
 

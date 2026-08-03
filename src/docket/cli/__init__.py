@@ -22,6 +22,8 @@ from docket.cli.commands import (
     commandSet,
     commandShow,
     commandStatus,
+    commandStatusRead,
+    commandTicket,
     commandValidate,
 )
 from docket.cli.grammar import (
@@ -31,11 +33,20 @@ from docket.cli.grammar import (
     EXIT_USAGE,
     OUT_ARGUMENT,
     PROGRAM_NAME,
+    TICKET_COMMAND,
+    TOKEN_ID,
+    TOKEN_KEY,
+    TOKEN_PRIORITY,
+    TOKEN_STATUS,
     buildParser,
+    classifyToken,
     describeKeys,
     describePriorities,
     parseEditIdList,
     parseIdList,
+    resolveGraphScope,
+    resolveListFilters,
+    rewriteIdFirst,
     tryDiscoverConfig,
 )
 from docket.cli.output import STATUS_STYLES, Output, buildContextTable, relativeToRoot
@@ -54,9 +65,15 @@ __all__: list[str] = [
     "OUT_ARGUMENT",
     "PROGRAM_NAME",
     "STATUS_STYLES",
+    "TICKET_COMMAND",
+    "TOKEN_ID",
+    "TOKEN_KEY",
+    "TOKEN_PRIORITY",
+    "TOKEN_STATUS",
     "Output",
     "buildContextTable",
     "buildParser",
+    "classifyToken",
     "commandDeploy",
     "commandGraph",
     "commandKey",
@@ -66,6 +83,8 @@ __all__: list[str] = [
     "commandSet",
     "commandShow",
     "commandStatus",
+    "commandStatusRead",
+    "commandTicket",
     "commandValidate",
     "describeKeys",
     "describePriorities",
@@ -74,6 +93,9 @@ __all__: list[str] = [
     "parseEditIdList",
     "parseIdList",
     "relativeToRoot",
+    "resolveGraphScope",
+    "resolveListFilters",
+    "rewriteIdFirst",
     "tryDiscoverConfig",
 ]
 
@@ -93,7 +115,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     config: Optional[Config] = tryDiscoverConfig()
 
     parser: argparse.ArgumentParser = buildParser(config)
-    args: argparse.Namespace = parser.parse_args(argv)
+
+    # A leading ticket id is the shape a person types, so it is named as the branch that handles it before the parser is ever asked about it.
+    arguments: list[str] = sys.argv[1:] if argv is None else argv
+    args: argparse.Namespace = parser.parse_args(rewriteIdFirst(arguments))
+
     output: Output = Output()
 
     # With no subcommand there is nothing to dispatch, so show help and report a usage error.
@@ -128,12 +154,9 @@ def dispatch(args: argparse.Namespace, config: Optional[Config], output: Output)
     store: Store = Store(config if config is not None else discoverConfig())
 
     handlers = {
+        TICKET_COMMAND: commandTicket,
         "new": commandNew,
-        "show": commandShow,
         "list": commandList,
-        "set": commandSet,
-        "status": commandStatus,
-        "meta": commandMeta,
         "graph": commandGraph,
         "key": commandKey,
         "validate": commandValidate,

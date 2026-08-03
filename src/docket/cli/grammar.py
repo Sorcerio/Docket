@@ -15,7 +15,8 @@ from rich_argparse import RichHelpFormatter
 
 from docket import __version__
 from docket.core.config import Config, discoverConfig
-from docket.core.errors import DocketError, InvalidIdError
+from docket.core.errors import ConflictingArgumentsError, DocketError, InvalidArgumentError, InvalidIdError
+from docket.core.ids import isValidId, isValidKey
 from docket.core.ticket import STATUSES
 
 # MARK: Constants
@@ -27,6 +28,15 @@ PROGRAM_NAME: str = "docket"
 EXIT_OK: int = 0
 EXIT_INVALID: int = 1
 EXIT_USAGE: int = 2
+
+# The name the one-ticket branch is registered under. It is a placeholder rather than a word, because what reaches it is a ticket id and never this string. Registering it anyway is what lets `argparse` describe the branch in help and name it in an error, instead of it being an undocumented trick.
+TICKET_COMMAND: str = "<ID>"
+
+# What a bare positional token can be read as. Every class is decided by the token's own shape, and no token can fall into two, since an id carries a hyphen and a number, a key is uppercase, a status is one of a fixed lowercase set, and a priority is digits.
+TOKEN_ID: str = "id"
+TOKEN_KEY: str = "key"
+TOKEN_STATUS: str = "status"
+TOKEN_PRIORITY: str = "priority"
 
 # The word that clears a comma-separated list argument. An id can never collide with it, since every id is an uppercase key followed by a hyphen and a number.
 CLEAR_SENTINEL: str = "none"
@@ -89,6 +99,121 @@ def tryDiscoverConfig() -> Optional[Config]:
         return None
 
 
+def classifyToken(token: str) -> Optional[str]:
+    """
+    Decide what a bare positional token names, from its shape alone.
+
+    This is the whole of the rule that lets `docket list todo CORE 1` and `docket graph CORE-14` be written without a flag between them. The four classes cannot overlap, so no token is ever ambiguous and no ordering between the checks changes an answer.
+
+    token: The token to read.
+
+    Returns one of the `TOKEN_` names, or `None` when the token is none of them.
+    """
+
+    if isValidId(token):
+        return TOKEN_ID
+
+    if isValidKey(token):
+        return TOKEN_KEY
+
+    if token in STATUSES:
+        return TOKEN_STATUS
+
+    # A priority is a plain number, so a signed or decimal one is deliberately not a priority.
+    if token.isdigit():
+        return TOKEN_PRIORITY
+
+    return None
+
+
+def rewriteIdFirst(argv: list[str]) -> list[str]:
+    """
+    Rewrite an invocation that opens with a ticket id into the branch that handles one.
+
+    `docket CORE-14 done` is the shape a person types, and `argparse` cannot express "a subcommand, or else an id". It does not have to, because the two are distinguishable before parsing begins: every command name is lowercase and every id is an uppercase key followed by a hyphen and a number. So naming the branch is all this does, and the parser is left to do the rest, including the help and every error.
+
+    argv: The raw argument list.
+
+    Returns the list to parse, unchanged when it does not open with an id.
+    """
+
+    if not argv or not isValidId(argv[0]):
+        return argv
+
+    return [TICKET_COMMAND, *argv]
+
+
+def resolveListFilters(tokens: list[str], status: Optional[str], key: Optional[str], priorityMax: Optional[int]) -> tuple[Optional[str], Optional[str], Optional[int]]:
+    """
+    Resolve `list`'s filters from its bare tokens and its flags together.
+
+    A token says which filter it is by its own shape, so `docket list todo CORE 1` needs no flags at all. The flags remain for scripts and for anyone who would rather be explicit, and naming one filter twice is refused rather than quietly resolved in whichever direction the code happens to read.
+
+    tokens: The bare filter tokens, in any order.
+    status: The status named by `--status`, or `None`.
+    key: The key named by `--key`, or `None`.
+    priorityMax: The ceiling named by `--priority-max`, or `None`.
+
+    Returns the resolved `(status, key, priorityMax)` triple.
+    """
+
+    # Held as text so one loop can fill any of the three, then converted back on the way out.
+    resolved: dict[str, Optional[str]] = {
+        TOKEN_STATUS: status,
+        TOKEN_KEY: key,
+        TOKEN_PRIORITY: None if priorityMax is None else str(priorityMax),
+    }
+
+    for token in tokens:
+        kind: Optional[str] = classifyToken(token)
+
+        # An id is a whole other command rather than a filter, so name that command instead of calling the token unreadable.
+        if kind == TOKEN_ID:
+            raise InvalidArgumentError(f"'{token}' is a ticket id, which does not filter a list. Show it with '{PROGRAM_NAME} {token}'.")
+
+        if kind is None:
+            raise InvalidArgumentError(f"Cannot read '{token}' as a filter. Expected a status ({', '.join(STATUSES)}), a key, or a priority number.")
+
+        if resolved[kind] is not None:
+            raise ConflictingArgumentsError(f"The {kind} filter was given twice, the second time as '{token}'. Pass it once.")
+
+        resolved[kind] = token
+
+    ceiling: Optional[str] = resolved[TOKEN_PRIORITY]
+
+    return resolved[TOKEN_STATUS], resolved[TOKEN_KEY], None if ceiling is None else int(ceiling)
+
+
+def resolveGraphScope(scope: Optional[str], ticketId: Optional[str], key: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+    """
+    Resolve the graph's scope from its bare token and its flags together.
+
+    An id and a key are told apart by shape, which is what makes `docket graph CORE-14` and `docket graph GEN` both unambiguous. The flags stay for the explicit form, and combining the two spellings is refused, since `argparse` can enforce that `--id` and `--key` exclude each other but cannot reach across to a positional.
+
+    scope: The bare scope token, or `None`.
+    ticketId: The id named by `--id`, or `None`.
+    key: The key named by `--key`, or `None`.
+
+    Returns the resolved `(id, key)` pair, at most one of which is set.
+    """
+
+    if scope is None:
+        return ticketId, key
+
+    if ticketId is not None or key is not None:
+        raise ConflictingArgumentsError(f"'{scope}' already scopes the graph, so it cannot be combined with -i/--id or -k/--key.")
+
+    kind: Optional[str] = classifyToken(scope)
+
+    if kind == TOKEN_ID:
+        return scope, None
+
+    if kind == TOKEN_KEY:
+        return None, scope
+
+    raise InvalidArgumentError(f"Cannot read '{scope}' as a scope. Expected a ticket id, for example 'CORE-14', or a key.")
+
+
 def buildParser(config: Optional[Config] = None) -> argparse.ArgumentParser:
     """
     Build the top-level argument parser and every subcommand parser.
@@ -111,47 +236,24 @@ def buildParser(config: Optional[Config] = None) -> argparse.ArgumentParser:
     keyOptions: str = describeKeys(config)
     priorityOptions: str = describePriorities(config)
 
-    # Creating a ticket, which allocates the id and freezes the filename.
+    buildTicketParser(commands, priorityOptions)
+
+    # Creating a ticket, which allocates the id and freezes the filename. The key and the title are positional because both are required, and a required flag is a flag that should have been an argument.
     newParser: argparse.ArgumentParser = commands.add_parser("new", help="Create a ticket.", formatter_class=RichHelpFormatter)
-    newParser.add_argument("-k", "--key", required=True, help=f"The key to mint under. {keyOptions}")
-    newParser.add_argument("-t", "--title", required=True, help="The ticket title. The filename slug derives from this once, here.")
+    newParser.add_argument("key", metavar="KEY", help=f"The key to mint under. {keyOptions}")
+    newParser.add_argument("title", metavar="TITLE", help="The ticket title. The filename slug derives from this once, here.")
     newParser.add_argument("-r", "--requires", help="Comma-separated ids this ticket depends on.")
     newParser.add_argument("-p", "--priority", type=int, help=f"Priority, defaulting to the configured defaultPriority. {priorityOptions}")
     newParser.add_argument("-b", "--body", help="Prose for the body, placed under a heading built from the title.")
 
-    showParser: argparse.ArgumentParser = commands.add_parser("show", help="Show a ticket with its resolved dependency context.", formatter_class=RichHelpFormatter)
-    showParser.add_argument("id", help="The ticket id.")
-
     listParser: argparse.ArgumentParser = commands.add_parser("list", help="List ticket summaries.", formatter_class=RichHelpFormatter)
+    listParser.add_argument("filters", nargs="*", metavar="FILTER", help=f"Filters in any order, each read from its own shape: a status ({', '.join(STATUSES)}), a key, or a priority ceiling. The flags below are the same three, named explicitly.")
     listParser.add_argument("-s", "--status", choices=STATUSES, help="Keep only tickets with this status.")
     listParser.add_argument("-k", "--key", help=f"Keep only tickets carrying this key. {keyOptions}")
     listParser.add_argument("-m", "--priority-max", type=int, dest="priorityMax", help=f"Keep only tickets at or below this priority number. {priorityOptions}")
 
-    setParser: argparse.ArgumentParser = commands.add_parser("set", help="Change a ticket's title, priority, or dependencies.", formatter_class=RichHelpFormatter)
-    setParser.add_argument("id", help="The ticket id.")
-    setParser.add_argument("-t", "--title", help="A new title. The filename does not follow it, since filenames are frozen at creation.")
-    setParser.add_argument("-p", "--priority", type=int, help=f"A new priority. {priorityOptions}")
-    setParser.add_argument("-r", "--requires", help=f"A replacement comma-separated dependency list. Pass '{CLEAR_SENTINEL}' to clear it.")
-    setParser.add_argument("-ra", "--requires-add", dest="requiresAdd", help="Comma-separated ids to append to the existing dependency list, leaving the rest of it alone.")
-    setParser.add_argument("-rr", "--requires-remove", dest="requiresRemove", help="Comma-separated ids to drop from the existing dependency list, leaving the rest of it alone.")
-
-    statusParser: argparse.ArgumentParser = commands.add_parser("status", help="Change a ticket's status, moving its file to match.", formatter_class=RichHelpFormatter)
-    statusParser.add_argument("id", help="The ticket id.")
-    statusParser.add_argument("status", choices=STATUSES, help="The new status.")
-
-    metaParser: argparse.ArgumentParser = commands.add_parser("meta", help="Inspect and manage a ticket's metadata map.", formatter_class=RichHelpFormatter)
-    metaCommands = metaParser.add_subparsers(dest="metaCommand", metavar="SUBCOMMAND")
-
-    metaGetParser: argparse.ArgumentParser = metaCommands.add_parser("get", help="Show a ticket's metadata.", formatter_class=RichHelpFormatter)
-    metaGetParser.add_argument("id", help="The ticket id.")
-
-    metaSetParser: argparse.ArgumentParser = metaCommands.add_parser("set", help="Set or clear one metadata key.", formatter_class=RichHelpFormatter)
-    metaSetParser.add_argument("id", help="The ticket id.")
-    metaSetParser.add_argument("key", help="The metadata key. Namespace it, for example 'video', so it cannot collide with another tool's key.")
-    metaSetParser.add_argument("value", nargs="?", help="The value to store. Omit with -c/--clear to remove the key instead.")
-    metaSetParser.add_argument("-c", "--clear", action="store_true", help="Remove the key instead of setting it.")
-
     graphParser: argparse.ArgumentParser = commands.add_parser("graph", help="Render the dependency graph as mermaid source.", formatter_class=RichHelpFormatter)
+    graphParser.add_argument("scope", nargs="?", metavar="SCOPE", help="What to scope to, read from its own shape: a ticket id, or a key. The flags below are the same two, named explicitly.")
     graphScope = graphParser.add_mutually_exclusive_group()
     graphScope.add_argument("-i", "--id", help="Scope to one ticket's ancestors and descendants.")
     graphScope.add_argument("-k", "--key", help=f"Scope to one key, plus its immediate cross-key neighbors. {keyOptions}")
@@ -179,6 +281,53 @@ def buildParser(config: Optional[Config] = None) -> argparse.ArgumentParser:
     upgradeParser.add_argument("path", help="The repository root to upgrade.")
 
     return parser
+
+
+def buildTicketParser(commands: argparse._SubParsersAction, priorityOptions: str) -> argparse.ArgumentParser:
+    """
+    Build the branch that works with one ticket, named by its id.
+
+    `prog` is set to the program name alone, and the id is added before the subcommands, so `argparse` derives every child's usage line as `docket ID <command>`. That is exactly what was typed, rather than the placeholder the branch is registered under.
+
+    commands: The top-level subparser action to register into.
+    priorityOptions: The sentence describing the priority band, already built.
+
+    Returns the branch parser.
+    """
+
+    ticketParser: argparse.ArgumentParser = commands.add_parser(
+        TICKET_COMMAND,
+        prog=PROGRAM_NAME,
+        help="Work with one ticket. A bare id shows it, a status word sets it.",
+        description="Work with the ticket named by ID. Status is the truth and the directory follows it, so setting a status may move the file.",
+        formatter_class=RichHelpFormatter,
+    )
+    ticketParser.add_argument("id", metavar="ID", help="The ticket id, for example CORE-14.")
+
+    # Not required, so a bare id parses and falls through to showing the ticket.
+    ticketCommands = ticketParser.add_subparsers(dest="ticketCommand", metavar="COMMAND")
+
+    ticketCommands.add_parser("show", help="Show the ticket with its resolved dependency context. This is what a bare id does.", formatter_class=RichHelpFormatter)
+    ticketCommands.add_parser("status", help="Print the ticket's status and nothing else, for a pipe to read.", formatter_class=RichHelpFormatter)
+
+    # One parser per status is what makes 'docket CORE-14 done' work. It also puts the whole vocabulary into the error when a command is misspelled, which a single `choices` list on a value argument could not do.
+    for status in STATUSES:
+        ticketCommands.add_parser(status, help=f"Set the status to {status}.", formatter_class=RichHelpFormatter)
+
+    setParser: argparse.ArgumentParser = ticketCommands.add_parser("set", help="Change the ticket's title, priority, or dependencies.", formatter_class=RichHelpFormatter)
+    setParser.add_argument("-t", "--title", help="A new title. The filename does not follow it, since filenames are frozen at creation.")
+    setParser.add_argument("-p", "--priority", type=int, help=f"A new priority. {priorityOptions}")
+    setParser.add_argument("-r", "--requires", help=f"A replacement comma-separated dependency list. Pass '{CLEAR_SENTINEL}' to clear it.")
+    setParser.add_argument("-ra", "--requires-add", dest="requiresAdd", help="Comma-separated ids to append to the existing dependency list, leaving the rest of it alone.")
+    setParser.add_argument("-rr", "--requires-remove", dest="requiresRemove", help="Comma-separated ids to drop from the existing dependency list, leaving the rest of it alone.")
+
+    # How much of the call was typed is what it means, the same way a status reads with no value and writes with one.
+    metaParser: argparse.ArgumentParser = ticketCommands.add_parser("meta", help="Inspect and manage the ticket's metadata map.", formatter_class=RichHelpFormatter)
+    metaParser.add_argument("key", nargs="?", metavar="KEY", help="The metadata key. Namespace it, for example 'video', so it cannot collide with another tool's key. Omit it to show the whole map.")
+    metaParser.add_argument("value", nargs="?", metavar="VALUE", help="The value to store. Omit it to print the key's value and nothing else.")
+    metaParser.add_argument("-c", "--clear", action="store_true", help="Remove the key instead of setting it.")
+
+    return ticketParser
 
 
 def parseIdList(value: Optional[str]) -> Optional[list[str]]:

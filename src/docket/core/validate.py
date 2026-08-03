@@ -303,7 +303,7 @@ def _checkStatusDirectory(ticket: Ticket, store: Store) -> list[Finding]:
         Finding(
             severity=SEVERITY_ERROR,
             rule=RULE_STATUS_DIRECTORY,
-            message=f"Ticket '{ticket.id}' has status '{ticket.status}' but sits in '{ticket.path.parent.name}/' rather than '{expected.name}/'. Use 'docket status' rather than moving files by hand.",
+            message=f"Ticket '{ticket.id}' has status '{ticket.status}' but sits in '{ticket.path.parent.name}/' rather than '{expected.name}/'. Use 'docket {ticket.id} {ticket.status}' rather than moving files by hand.",
             ticketId=ticket.id,
             path=ticket.path,
         )
