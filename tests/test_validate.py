@@ -220,7 +220,7 @@ def testAStatusDirectoryMismatchIsAnError(store: Store, config: Config) -> None:
     report: ValidationReport = validate(store)
 
     assert RULE_STATUS_DIRECTORY in rules(report)
-    assert "docket status" in report.errors[0].message
+    assert "docket CORE-1 todo" in report.errors[0].message
 
 
 def testWipBelongsInTheTodoDirectory(store: Store, config: Config) -> None:
