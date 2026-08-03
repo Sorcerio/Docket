@@ -13,8 +13,9 @@ import tomlkit
 from tomlkit import TOMLDocument
 from tomlkit.items import Comment, Table
 
+from docket.core.atomic import writeTextAtomic
 from docket.core.errors import ConfigError, ConfigNotFoundError, InvalidKeyError, UnknownKeyError
-from docket.core.fields import readInt, readString
+from docket.core.fields import readFloat, readInt, readString
 from docket.core.ids import requireValidKey
 from docket.core.inputs import requireText
 
@@ -32,6 +33,7 @@ DEFAULT_TODO_DIR: str = "todo"
 DEFAULT_DONE_DIR: str = "done"
 DEFAULT_PRIORITY: int = 2
 DEFAULT_MAX_PRIORITY: int = 4
+DEFAULT_LOCK_TIMEOUT: float = 5.0
 
 # MARK: Classes
 
@@ -65,10 +67,15 @@ class Config:
         self.doneDir: str = readString(document, "doneDir", ConfigError, source, DEFAULT_DONE_DIR)
         self.defaultPriority: int = readInt(document, "defaultPriority", ConfigError, source, DEFAULT_PRIORITY)
         self.maxPriority: int = readInt(document, "maxPriority", ConfigError, source, DEFAULT_MAX_PRIORITY)
+        self.lockTimeout: float = readFloat(document, "lockTimeout", ConfigError, source, DEFAULT_LOCK_TIMEOUT)
 
         # A default outside the allowed band would make every created ticket invalid, so catch it at load.
         if not 0 <= self.defaultPriority <= self.maxPriority:
             raise ConfigError(f"defaultPriority {self.defaultPriority} is outside 0 through maxPriority {self.maxPriority} in {self.path}.")
+
+        # A timeout of zero or less would fail every operation that ever met contention, so it is never what the writer meant.
+        if self.lockTimeout <= 0:
+            raise ConfigError(f"lockTimeout {self.lockTimeout} in {self.path} must be greater than 0. It is a wait in seconds.")
 
     # MARK: Properties
 
@@ -266,8 +273,8 @@ class Config:
         Write the document back to disk, preserving comments, spacing, and key order.
         """
 
-        # Write LF newlines explicitly so a checkout on Windows does not churn the file.
-        self.path.write_text(tomlkit.dumps(self.document), encoding="utf-8", newline="\n")
+        # Replace the file in one step, so a concurrent reader sees either the old configuration or the new one and never a truncated file.
+        writeTextAtomic(self.path, tomlkit.dumps(self.document))
 
 
 # MARK: Functions

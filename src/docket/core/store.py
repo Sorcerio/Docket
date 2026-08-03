@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator, Optional
 
+from docket.core.atomic import writeTextAtomic
 from docket.core.config import Config
 from docket.core.errors import ConflictingArgumentsError, InvalidPriorityError, InvalidStatusError, TicketNotFoundError, TicketParseError
 from docket.core.ids import buildFilename, nextId, parseId, requireValidKey
@@ -288,8 +289,8 @@ class Store:
         # A freshly deployed repository may not have the status directories yet.
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Write LF explicitly so the file does not churn on a Windows checkout.
-        path.write_text(serializeTicket(ticket), encoding="utf-8", newline="\n")
+        # Replace the file in one step, so a concurrent reader sees either the old ticket or the new one and never a truncated file.
+        writeTextAtomic(path, serializeTicket(ticket))
         ticket.path = path
 
         return ticket

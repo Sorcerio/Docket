@@ -60,6 +60,31 @@ def readInt(mapping: Mapping[str, Any], name: str, errorType: Type[DocketError],
     return int(value)
 
 
+def readFloat(mapping: Mapping[str, Any], name: str, errorType: Type[DocketError], source: str, fallback: Optional[float] = None) -> float:
+    """
+    Read a number field as a float.
+
+    An integer is accepted and widened, since a configuration writing `5` rather than `5.0` means the same thing and refusing it would be pedantic.
+
+    mapping: The parsed mapping to read from.
+    name: The field name.
+    errorType: The exception raised when the field is absent or of the wrong type.
+    source: What to name in the error message, for example `Configuration`.
+    fallback: The value used when the field is absent, or `None` to make the field required.
+
+    Returns the field value.
+    """
+
+    value: Any = _readRaw(mapping, name, errorType, source, fallback)
+
+    # `bool` subclasses `int` in Python, so exclude it explicitly rather than reading `true` as 1.0.
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise errorType(f"{source} field '{name}' must be a number, got {type(value).__name__}.")
+
+    # Narrow to exactly `float`, for the same reason as `readString`.
+    return float(value)
+
+
 def readStringList(mapping: Mapping[str, Any], name: str, errorType: Type[DocketError], source: str) -> list[str]:
     """
     Read a list-of-strings field.

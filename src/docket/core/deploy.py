@@ -14,6 +14,7 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
+from docket.core.atomic import writeTextAtomic
 from docket.core.config import CONFIG_FILENAME, Config, loadConfig
 from docket.core.errors import DeployError
 
@@ -233,11 +234,9 @@ def _write(path: Path, text: str) -> None:
     """
     Write a file, creating its parent directories.
 
-    LF is written explicitly so a Windows checkout does not churn the file.
-
     path: Where to write.
     text: What to write.
     """
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8", newline="\n")
+    writeTextAtomic(path, text)
