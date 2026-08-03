@@ -6,21 +6,24 @@ Each ticket is plain markdown. Open it in any text editor and it reads like a no
 
 Docket itself lives in this repo alone. Deploy it into any number of consumer repositories with one command, and only the ticket data and configuration travel. Never a copy of the tool.
 
-![Docket demo](docs/demo/docket.gif)
+![Docket demo](https://raw.githubusercontent.com/Sorcerio/Docket/master/docs/demo/docket.gif)
 
 * [docket](#docket)
     * [Install](#install)
     * [Deploy into a Repository](#deploy-into-a-repository)
     * [What a Ticket Looks Like](#what-a-ticket-looks-like)
     * [Three Ideas Worth Knowing](#three-ideas-worth-knowing)
+    * [Docket Runs on Docket](#docket-runs-on-docket)
     * [CLI](#cli)
     * [MCP](#mcp)
     * [Configuration](#configuration)
+        * [Concurrent Access](#concurrent-access)
     * [Validation Rules](#validation-rules)
     * [Development](#development)
         * [Working on the Repo](#working-on-the-repo)
         * [Versioning](#versioning)
         * [Local Installation](#local-installation)
+    * [License](#license)
 
 ---
 
@@ -29,10 +32,22 @@ Docket itself lives in this repo alone. Deploy it into any number of consumer re
 Once per machine:
 
 ```bash
-uv tool install git+https://github.com/Sorcerio/Docket
+uv tool install docket
 ```
 
-That provides two console scripts, `docket` for humans and CI, and `docket-mcp` for agents.
+Or with pipx, if that is what you already keep your tools in:
+
+```bash
+pipx install docket
+```
+
+Either one provides two console scripts, `docket` for humans and CI, and `docket-mcp` for agents.
+
+To run an unreleased revision, install from the repository instead:
+
+```bash
+uv tool install git+https://github.com/Sorcerio/Docket
+```
 
 ## Deploy into a Repository
 
@@ -89,6 +104,12 @@ The filename is `CORE-14_skirmishSetup.md`, frozen at creation. Retitling does n
 - **Status is the truth and the directory follows it.** Only `done` moves a file. Nothing writes one without the other, and `validate` catches a file that was moved by hand.
 
 - **Keys are closed, and adding one is the user's call.** An unregistered key is refused, so a typo cannot spawn an orphan group. An agent that needs a new key is told to ask first, with `AskUserQuestion`, and only then call `add_key`. The gate is a conversation rather than a queue of proposals to triage later, because in practice a human would never propose a key, they would just add it.
+
+## Docket Runs on Docket
+
+This repository is its own first consumer. Every feature described here arrived as a ticket, and that board is committed beside the code in `docs/tickets/` rather than living in a service somewhere.
+
+So the work is readable in the same place as the result. `docs/tickets/done/` is the history of how the tool got built, one markdown file per piece of it, and `docs/tickets/todo/` is what is coming next. The agent writing the code reads those same files over MCP, which is the whole argument for the format in one repository you can go look at.
 
 ## CLI
 
@@ -229,3 +250,9 @@ You can install Docket as a tool from your repo root:
 cd /your/repo/root/
 uv tool install --editable --force .
 ```
+
+## License
+
+Docket is licensed under the [GNU General Public License v3.0 or later](LICENSE).
+
+That license carries an output exception. Anything Docket writes into your repository is yours under whatever terms you choose, which covers the templates that `deploy` and `upgrade` copy, every ticket file, and every generated artifact. Running Docket against a repository places no obligation of the license on that repository or on anything else in it. The exception reaches only what Docket produces, never Docket's own source.
