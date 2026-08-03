@@ -140,21 +140,28 @@ async def updateTicket(
     title: Optional[str] = None,
     priority: Optional[int] = None,
     requires: Optional[list[str]] = None,
+    requires_add: Optional[list[str]] = None,
+    requires_remove: Optional[list[str]] = None,
 ) -> str:
     """
     Change a ticket's title, priority, or dependencies.
 
     Only the fields supplied are touched. Status is not changeable here, because changing it moves the file, which is `set_status`. The filename never changes, even when the title does, so prose cross-references elsewhere stay intact.
 
+    The dependency list is edited either wholesale or in place, never both in one call. Passing `requires` alongside `requires_add` or `requires_remove` is refused, since it asks for two contradictory things at once.
+
     id: The ticket id.
     title: A new title, which cannot be empty.
     priority: A new priority. 0 is most urgent.
     requires: A replacement dependency list. Pass an empty list to clear it.
+    requires_add: Ids to append to the existing list. One already there is not duplicated.
+    requires_remove: Ids to drop from the existing list. One that is not there is ignored.
     """
 
-    result: TicketResult = _store().update(ticketId=id, title=title, priority=priority, requires=requires)
+    result: TicketResult = _store().update(ticketId=id, title=title, priority=priority, requires=requires, requiresAdd=requires_add, requiresRemove=requires_remove)
 
-    return _json({"id": result.ticket.id, "warnings": result.warnings, "ticket": result.ticket.summary()})
+    # The summary carries no dependency list, and an in-place edit is worth nothing if the caller cannot see what it landed on.
+    return _json({"id": result.ticket.id, "warnings": result.warnings, "ticket": result.ticket.summary(), "requires": result.ticket.requires})
 
 
 @mcp.tool(name="set_metadata")

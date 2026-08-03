@@ -207,6 +207,8 @@ def buildParser(config: Optional[Config] = None) -> argparse.ArgumentParser:
     setParser.add_argument("-t", "--title", help="A new title. The filename does not follow it, since filenames are frozen at creation.")
     setParser.add_argument("-p", "--priority", type=int, help=f"A new priority. {priorityOptions}")
     setParser.add_argument("-r", "--requires", help=f"A replacement comma-separated dependency list. Pass '{CLEAR_SENTINEL}' to clear it.")
+    setParser.add_argument("-ra", "--requires-add", dest="requiresAdd", help="Comma-separated ids to append to the existing dependency list, leaving the rest of it alone.")
+    setParser.add_argument("-rr", "--requires-remove", dest="requiresRemove", help="Comma-separated ids to drop from the existing dependency list, leaving the rest of it alone.")
 
     statusParser: argparse.ArgumentParser = commands.add_parser("status", help="Change a ticket's status, moving its file to match.", formatter_class=RichHelpFormatter)
     statusParser.add_argument("id", help="The ticket id.")
@@ -423,8 +425,8 @@ def commandSet(args: argparse.Namespace, store: Store, output: Output) -> int:
     """
 
     # Nothing to do is a usage error rather than a silent success, since the caller clearly meant to change something.
-    if args.title is None and args.priority is None and args.requires is None:
-        output.error("Nothing to change. Pass at least one of --title, --priority, or --requires.")
+    if args.title is None and args.priority is None and args.requires is None and args.requiresAdd is None and args.requiresRemove is None:
+        output.error("Nothing to change. Pass at least one of --title, --priority, --requires, --requires-add, or --requires-remove.")
         return EXIT_USAGE
 
     result: TicketResult = store.update(
@@ -432,6 +434,8 @@ def commandSet(args: argparse.Namespace, store: Store, output: Output) -> int:
         title=args.title,
         priority=args.priority,
         requires=parseIdList(args.requires) if args.requires is not None else None,
+        requiresAdd=parseEditIdList(args.requiresAdd, "--requires-add"),
+        requiresRemove=parseEditIdList(args.requiresRemove, "--requires-remove"),
     )
 
     for warning in result.warnings:
@@ -704,6 +708,26 @@ def parseIdList(value: Optional[str]) -> Optional[list[str]]:
             raise InvalidIdError(f"'{CLEAR_SENTINEL}' clears the whole list, so it cannot be combined with an id. Pass either '{CLEAR_SENTINEL}' alone or only ids.")
 
         return []
+
+    return entries
+
+
+def parseEditIdList(value: Optional[str], flag: str) -> Optional[list[str]]:
+    """
+    Split a comma-separated id list for an argument that edits a list rather than replacing one.
+
+    Clearing is what `--requires` is for, so an empty result here means the caller named an edit and then named nothing to do, which is a usage error rather than a silent no-op.
+
+    value: The raw argument value.
+    flag: The flag the value came from, named in the error.
+
+    Returns the ids, or `None` when the argument was absent.
+    """
+
+    entries: Optional[list[str]] = parseIdList(value)
+
+    if entries is not None and not entries:
+        raise InvalidIdError(f"'{flag}' needs at least one id. Use '--requires {CLEAR_SENTINEL}' to clear the list instead.")
 
     return entries
 

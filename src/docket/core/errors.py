@@ -81,6 +81,14 @@ class EmptyValueError(DocketError):
     """
 
 
+class ConflictingArgumentsError(DocketError):
+    """
+    Raised when two arguments in one call ask for contradictory things.
+
+    Replacing a dependency list and editing that same list in place is the case this exists for, since honoring both would mean picking an order the caller never stated.
+    """
+
+
 class OutputPathError(DocketError):
     """
     Raised when a path supplied as a destination cannot be written to.

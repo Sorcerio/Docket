@@ -96,7 +96,7 @@ The filename is `CORE-14_skirmishSetup.md`, frozen at creation. Retitling does n
 docket new -k CORE -t "Skirmish setup" [-r CORE-9,GEN-3] [-p 1] [-b TEXT]
 docket show CORE-14
 docket list [-s todo] [-k CORE] [-m 2]
-docket set CORE-14 [-t TEXT] [-p N] [-r A,B|none]
+docket set CORE-14 [-t TEXT] [-p N] [-r A,B|none] [-ra A,B] [-rr A,B]
 docket status CORE-14 done
 docket graph [-i CORE-14 | -k GEN] [-o FILE]
 docket key list
@@ -107,7 +107,9 @@ docket deploy PATH
 docket upgrade PATH
 ```
 
-Every short flag has a long form: `-k/--key`, `-t/--title`, `-r/--requires`, `-p/--priority`, `-b/--body`, `-s/--status`, `-m/--priority-max`, `-i/--id`, `-o/--out`, `-r/--rationale`, `-V/--version`.
+Every short flag has a long form: `-k/--key`, `-t/--title`, `-r/--requires`, `-ra/--requires-add`, `-rr/--requires-remove`, `-p/--priority`, `-b/--body`, `-s/--status`, `-m/--priority-max`, `-i/--id`, `-o/--out`, `-r/--rationale`, `-V/--version`.
+
+`-r` replaces the whole dependency list. `-ra` and `-rr` edit the list already there, so changing one entry of a long list does not mean retyping the rest of it. An id already present is not added twice, and one that is not there is removed without complaint. A replacement and an edit in the same call is refused, since it asks for two contradictory things at once.
 
 Where an argument takes one of a discrete set, `--help` lists the set. The keys come from your `[keys]` table and the priorities from `0` through `maxPriority`, so the options shown are the ones this repository actually accepts.
 
@@ -128,7 +130,7 @@ Where an argument takes one of a discrete set, `--help` lists the set. The keys 
 | `list_tickets(status?, key?, priority_max?)` | Summaries only, never bodies. |
 | `read_ticket(id)` | Full body plus both dependency directions resolved. |
 | `create_ticket(key, title, body?, requires?, priority?)` | Allocates the id and writes the file. |
-| `update_ticket(id, title?, priority?, requires?)` | Changes only these three fields. |
+| `update_ticket(id, title?, priority?, requires?, requires_add?, requires_remove?)` | Changes only these three fields. `requires` replaces the dependency list, `requires_add` and `requires_remove` edit the one already there. |
 | `set_status(id, status)` | Updates frontmatter and moves the file together. |
 | `graph(id?, key?)` | Returns mermaid source. |
 | `list_keys()` | The registered keys. |

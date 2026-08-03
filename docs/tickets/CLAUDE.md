@@ -71,6 +71,8 @@ A ticket declares what it `requires`. It never declares what it blocks.
 
 The reverse direction is derived, not stored. `read_ticket` returns both, so to find out what a ticket is blocking, read it and look at `requiredBy`. Do not add a "blocks" field. Storing both directions guarantees they eventually disagree, which is exactly what this design exists to prevent.
 
+To change one edge, use `update_ticket` with `requires_add` or `requires_remove` rather than reading the list and passing it back with one entry different. Those edit the list in place, so nothing you did not name is at risk. Reserve `requires` for when you genuinely mean to replace the whole list, and never pass it in the same call as an edit, which is refused.
+
 ## Keys are closed
 
 A ticket's key is the part before the hyphen. It groups related work.

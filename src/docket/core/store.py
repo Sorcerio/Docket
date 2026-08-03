@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Iterator, Optional
 
 from docket.core.config import Config
-from docket.core.errors import InvalidPriorityError, InvalidStatusError, TicketNotFoundError, TicketParseError
+from docket.core.errors import ConflictingArgumentsError, InvalidPriorityError, InvalidStatusError, TicketNotFoundError, TicketParseError
 from docket.core.ids import buildFilename, nextId, parseId, requireValidKey
 from docket.core.inputs import requireText
 from docket.core.ticket import STATUS_DONE, STATUSES, Ticket, buildBody, parseTicket, serializeTicket
@@ -343,19 +343,29 @@ class Store:
         title: Optional[str] = None,
         priority: Optional[int] = None,
         requires: Optional[list[str]] = None,
+        requiresAdd: Optional[list[str]] = None,
+        requiresRemove: Optional[list[str]] = None,
     ) -> TicketResult:
         """
         Change a ticket's title, priority, or dependencies in place.
 
         Status is deliberately excluded, because changing it moves the file and that belongs to `setStatus`. The filename is excluded because it is frozen at creation, so a retitle leaves every prose cross-reference intact.
 
+        The dependency list is edited either wholesale or in place, never both in one call. `requires` replaces it. `requiresAdd` and `requiresRemove` edit whatever is already there, which is what spares a caller from retyping a long list to change one entry.
+
         ticketId: The ticket to change.
         title: A new title, if any.
         priority: A new priority, if any.
         requires: A replacement dependency list, if any.
+        requiresAdd: Ids to append to the existing list, if any.
+        requiresRemove: Ids to drop from the existing list, if any.
 
         Returns the written ticket and any warnings.
         """
+
+        # Replacing the list and editing it in place at once names no order the caller actually asked for.
+        if requires is not None and (requiresAdd is not None or requiresRemove is not None):
+            raise ConflictingArgumentsError("A replacement dependency list cannot be combined with adding to or removing from the existing one. Pass either the replacement or the edits.")
 
         existing: TicketSet = self.loadAll()
         ticket: Ticket = existing.get(ticketId)
@@ -369,6 +379,17 @@ class Store:
 
         if requires is not None:
             ticket.requires = list(requires)
+
+        # Removal runs first, so passing the same id to both ends with it present rather than gone.
+        if requiresRemove is not None:
+            dropped: set[str] = set(requiresRemove)
+            ticket.requires = [required for required in ticket.requires if required not in dropped]
+
+        # New ids append in the order given, and one already present is left where it is rather than duplicated.
+        if requiresAdd is not None:
+            for required in requiresAdd:
+                if required not in ticket.requires:
+                    ticket.requires.append(required)
 
         return TicketResult(ticket=self.write(ticket), warnings=self.__danglingWarnings(ticket, existing))
 

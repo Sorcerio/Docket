@@ -372,6 +372,32 @@ def testUpdateTicketChangesFieldsWithoutRenaming(inRepo: Path) -> None:
     assert (inRepo / "docs" / "tickets" / "todo" / "CORE-1_originalTitle.md").is_file()
 
 
+def testUpdateTicketEditsRequiresInPlace(inRepo: Path) -> None:
+    """
+    The snake_case edit parameters reach the core's camelCase ones, so an agent can change one edge without restating the list.
+    """
+
+    callTool("create_ticket", {"key": "CORE", "title": "First"})
+    callTool("create_ticket", {"key": "CORE", "title": "Second"})
+    callTool("create_ticket", {"key": "CORE", "title": "Third", "requires": ["CORE-1"]})
+
+    assert callTool("update_ticket", {"id": "CORE-3", "requires_add": ["CORE-2"]})["requires"] == ["CORE-1", "CORE-2"]
+    assert callTool("update_ticket", {"id": "CORE-3", "requires_remove": ["CORE-1"]})["requires"] == ["CORE-2"]
+
+
+def testUpdateTicketRefusesReplacingAndEditingAtOnce(inRepo: Path) -> None:
+    """
+    A replacement alongside an edit is a tool error rather than a silently resolved contradiction.
+    """
+
+    callTool("create_ticket", {"key": "CORE", "title": "First"})
+
+    with pytest.raises(Exception) as excInfo:
+        callTool("update_ticket", {"id": "CORE-1", "requires": ["GEN-1"], "requires_add": ["GEN-2"]})
+
+    assert "cannot be combined" in str(excInfo.value)
+
+
 def testUpdateTicketCannotChangeStatus(inRepo: Path) -> None:
     """
     Status is absent from this tool's schema, because changing it moves the file and that belongs to `set_status`.
