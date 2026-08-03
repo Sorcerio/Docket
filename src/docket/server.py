@@ -11,6 +11,11 @@ MCP tool names and their parameters are snake_case, because that is the MCP ecos
 This repository's Python is camelCase. The two meet here and nowhere else.
 Each handler is a camelCase Python function carrying an explicit snake_case `name`, its parameters are snake_case because they are the wire format, and the first thing every body does is hand those values to camelCase core calls.
 Neither convention leaks into the other.
+
+Every handler is `async` on purpose. `MCPServer` runs a synchronous handler on a worker thread, which would let two tool calls into `docket.core` at once, and every write there is an unguarded read of the ticket set followed by a write back.
+Concurrent creates would allocate one id twice, concurrent edits would lose one of them, and a read landing mid-write would see a half-written file.
+Declaring the handlers `async` keeps them on the event loop, serialized, which is what this server has always done and what the core is written to assume.
+Nothing here awaits, so this costs an event loop hop and buys back that guarantee.
 """
 
 # MARK: Imports
@@ -19,7 +24,7 @@ import json
 import sys
 from typing import Any, Optional
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 
 from docket import __version__
 from docket.core.config import Config, discoverConfig
@@ -51,17 +56,14 @@ Keys are closed. Call `list_keys` before `create_ticket`. When no existing key f
 
 # MARK: Server
 
-mcp: FastMCP = FastMCP(name=SERVER_NAME, instructions=SERVER_INSTRUCTIONS)
-
-# `FastMCP` accepts no version and forwards none to the lowlevel server it wraps, which then falls back to reporting the `mcp` package's own version as ours.
-# Assigning it here is the only way to advertise the real one. `version` is a plain attribute on that server, read when the client initializes, so a late assignment still reaches the handshake.
-mcp._mcp_server.version = __version__
+# An unversioned server reports an empty version, so the real one is passed here and reaches the handshake through the constructor.
+mcp: MCPServer = MCPServer(name=SERVER_NAME, instructions=SERVER_INSTRUCTIONS, version=__version__)
 
 # MARK: Functions
 
 
 @mcp.tool(name="list_tickets")
-def listTickets(status: Optional[str] = None, key: Optional[str] = None, priority_max: Optional[int] = None) -> str:
+async def listTickets(status: Optional[str] = None, key: Optional[str] = None, priority_max: Optional[int] = None) -> str:
     """
     List ticket summaries, ordered by priority and then by id.
 
@@ -79,7 +81,7 @@ def listTickets(status: Optional[str] = None, key: Optional[str] = None, priorit
 
 
 @mcp.tool(name="read_ticket")
-def readTicket(id: str) -> str:
+async def readTicket(id: str) -> str:
     """
     Read one ticket in full, with its dependency context resolved.
 
@@ -104,7 +106,7 @@ def readTicket(id: str) -> str:
 
 
 @mcp.tool(name="create_ticket")
-def createTicket(
+async def createTicket(
     key: str,
     title: str,
     body: Optional[str] = None,
@@ -133,7 +135,7 @@ def createTicket(
 
 
 @mcp.tool(name="update_ticket")
-def updateTicket(
+async def updateTicket(
     id: str,
     title: Optional[str] = None,
     priority: Optional[int] = None,
@@ -156,7 +158,7 @@ def updateTicket(
 
 
 @mcp.tool(name="set_metadata")
-def setMetadata(id: str, key: str, value: Optional[Any] = None) -> str:
+async def setMetadata(id: str, key: str, value: Optional[Any] = None) -> str:
     """
     Set or clear one entry in a ticket's `metadata` map.
 
@@ -173,7 +175,7 @@ def setMetadata(id: str, key: str, value: Optional[Any] = None) -> str:
 
 
 @mcp.tool(name="set_status")
-def setStatus(id: str, status: str) -> str:
+async def setStatus(id: str, status: str) -> str:
     """
     Change a ticket's status, updating the frontmatter and moving the file in one operation.
 
@@ -189,7 +191,7 @@ def setStatus(id: str, status: str) -> str:
 
 
 @mcp.tool(name="graph")
-def graphTool(id: Optional[str] = None, key: Optional[str] = None) -> str:
+async def graphTool(id: Optional[str] = None, key: Optional[str] = None) -> str:
     """
     Render the dependency graph as mermaid source.
 
@@ -212,7 +214,7 @@ def graphTool(id: Optional[str] = None, key: Optional[str] = None) -> str:
 
 
 @mcp.tool(name="list_keys")
-def listKeys() -> str:
+async def listKeys() -> str:
     """
     List the keys tickets may be created under.
 
@@ -225,7 +227,7 @@ def listKeys() -> str:
 
 
 @mcp.tool(name="add_key")
-def addKey(key: str, description: str, rationale: str) -> str:
+async def addKey(key: str, description: str, rationale: str) -> str:
     """
     Register a new key, so tickets can be created under it.
 
@@ -244,7 +246,7 @@ def addKey(key: str, description: str, rationale: str) -> str:
 
 
 @mcp.tool(name="validate")
-def validateTool() -> str:
+async def validateTool() -> str:
     """
     Run every integrity rule over the ticket set and return structured findings.
 
@@ -266,7 +268,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     Returns the process exit code.
     """
 
-    # `FastMCP.run` owns the event loop, so no async runtime is imported here.
+    # `MCPServer.run` owns the event loop, so no async runtime is imported here.
     try:
         mcp.run(transport="stdio")
     except KeyboardInterrupt:

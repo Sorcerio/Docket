@@ -1,9 +1,10 @@
 ---
 id: BUG-3
 title: Migrate server to mcp 2.x MCPServer API
-status: todo
+status: done
 priority: 0
 requires: []
+metadata: {}
 ---
 
 # Migrate server to mcp 2.x MCPServer API

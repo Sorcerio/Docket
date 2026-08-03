@@ -201,9 +201,5 @@ You can install Docket as a tool from your repo root:
 
 ```bash
 cd /your/repo/root/
-uv tool install .
+uv tool install --editable --force .
 ```
-
-When adding new files, changing primary version number, and making other changes, unexpected behavior can occur.
-
-Avoid this by updating your installation by running the install command again.

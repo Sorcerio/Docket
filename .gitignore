@@ -14,5 +14,8 @@ wheels/
 .claude/settings.local.json
 .claude/commands/
 .claude/skills/commit-message/
+.claude/skills/talk-content/
+.claude/skills/video-planner/
+.videos/
 graph.mmd
 scripts/*.ps1

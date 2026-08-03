@@ -7,12 +7,14 @@ Drive tools through the real MCP dispatch path, covering the wire surface, paylo
 # MARK: Imports
 
 import asyncio
+import inspect
 import json
 import os
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 import pytest
+from mcp.types import CallToolResult
 
 from docket import server
 
@@ -52,9 +54,9 @@ def callTool(name: str, arguments: dict[str, Any] | None = None) -> Any:
     Returns the decoded JSON payload.
     """
 
-    content, _ = asyncio.run(server.mcp.call_tool(name, arguments or {}))
+    result: CallToolResult = asyncio.run(server.mcp.call_tool(name, arguments or {}))
 
-    return json.loads(content[0].text)
+    return json.loads(result.content[0].text)
 
 
 def toolNames() -> list[str]:
@@ -65,6 +67,38 @@ def toolNames() -> list[str]:
     """
 
     return [tool.name for tool in asyncio.run(server.mcp.list_tools())]
+
+
+def toolHandlers() -> list[Callable[..., Any]]:
+    """
+    Collect the handler functions the tools are registered from.
+
+    `mcp.tool` hands back the function it decorated, so every handler is a plain attribute of the module. Imported names are excluded by the module they were defined in, and `main` is the entry point rather than a tool.
+
+    Returns the handler functions.
+    """
+
+    return [
+        value
+        for name, value in vars(server).items()
+        if inspect.isfunction(value) and value.__module__ == server.__name__ and not name.startswith("_") and name != "main"
+    ]
+
+
+def testEveryHandlerIsAsync() -> None:
+    """
+    `MCPServer` runs a synchronous handler on a worker thread, which would let two calls into the core at once, and every write there reads the ticket set and then writes it back with nothing guarding the gap.
+
+    Two creates would allocate one id twice, two edits would lose one of them, and a read landing mid-write would see a half-written file. Staying on the event loop is what prevents all three, so it is asserted rather than left to whoever adds the eleventh tool.
+    """
+
+    handlers: list[Callable[..., Any]] = toolHandlers()
+
+    # Counting against the registered tools is what makes this catch a new handler instead of only the ones present today.
+    assert len(handlers) == len(toolNames())
+
+    for handler in handlers:
+        assert inspect.iscoroutinefunction(handler), f"{handler.__name__} must be async, or it runs on a worker thread"
 
 
 def testEveryDocumentedToolIsRegistered() -> None:
@@ -86,7 +120,7 @@ def testToolNamesAndParametersAreSnakeCase() -> None:
         assert tool.name.islower()
         assert "_" in tool.name or tool.name.isalpha()
 
-        for parameter in tool.inputSchema.get("properties", {}):
+        for parameter in tool.input_schema.get("properties", {}):
             assert parameter == parameter.lower()
             assert not any(character.isupper() for character in parameter)
 
@@ -98,8 +132,8 @@ def testPriorityMaxIsSpelledForTheWire() -> None:
 
     listTickets = [tool for tool in asyncio.run(server.mcp.list_tools()) if tool.name == "list_tickets"][0]
 
-    assert "priority_max" in listTickets.inputSchema["properties"]
-    assert "priorityMax" not in listTickets.inputSchema["properties"]
+    assert "priority_max" in listTickets.input_schema["properties"]
+    assert "priorityMax" not in listTickets.input_schema["properties"]
 
 
 def testCreateTicketDescriptionDirectsTheAgentToListKeys() -> None:
@@ -345,7 +379,7 @@ def testUpdateTicketCannotChangeStatus(inRepo: Path) -> None:
 
     updateTicket = [tool for tool in asyncio.run(server.mcp.list_tools()) if tool.name == "update_ticket"][0]
 
-    assert "status" not in updateTicket.inputSchema["properties"]
+    assert "status" not in updateTicket.input_schema["properties"]
 
 
 def testSetStatusMovesTheFile(inRepo: Path) -> None:
@@ -525,8 +559,8 @@ def testPayloadsAreCompactJson(inRepo: Path) -> None:
 
     callTool("create_ticket", {"key": "CORE", "title": "App shell"})
 
-    content, _ = asyncio.run(server.mcp.call_tool("list_tickets", {}))
-    text: str = content[0].text
+    result: CallToolResult = asyncio.run(server.mcp.call_tool("list_tickets", {}))
+    text: str = result.content[0].text
 
     assert text.startswith('{"count":1')
     assert "\n" not in text
