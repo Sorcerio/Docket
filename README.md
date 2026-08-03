@@ -1,75 +1,47 @@
 # docket
 
-Docket provides tickets you can read, version, and control within your existing repository. Your favorite agent can read it too.
-
-Each ticket is plain markdown. Open it in any text editor and it reads like a note. Underneath, the same file is a structured record, and a Claude Code agent queries it over MCP with no parsing hacks and no hidden sync. One file, two readers.
-
-Docket itself lives in this repo alone. Deploy it into any number of consumer repositories with one command, and only the ticket data and configuration travel. Never a copy of the tool.
+Markdown tickets that live in your repo. You read them in a text editor or CLI. Your agent reads them over MCP.
 
 ![Docket demo](https://raw.githubusercontent.com/Sorcerio/Docket/master/docs/demo/docket.gif)
 
 * [docket](#docket)
-    * [Install](#install)
-    * [Deploy into a Repository](#deploy-into-a-repository)
-    * [What a Ticket Looks Like](#what-a-ticket-looks-like)
-    * [Three Ideas Worth Knowing](#three-ideas-worth-knowing)
-    * [Docket Runs on Docket](#docket-runs-on-docket)
+    * [Start Here](#start-here)
+    * [A Ticket](#a-ticket)
     * [CLI](#cli)
     * [MCP](#mcp)
+    * [Key Ticket Rules](#key-ticket-rules)
     * [Configuration](#configuration)
-        * [Concurrent Access](#concurrent-access)
-    * [Validation Rules](#validation-rules)
+    * [Concurrent Access](#concurrent-access)
+    * [Validation](#validation)
+    * [Docket Runs on Docket](#docket-runs-on-docket)
     * [Development](#development)
-        * [Working on the Repo](#working-on-the-repo)
-        * [Versioning](#versioning)
-        * [Local Installation](#local-installation)
     * [License](#license)
 
 ---
 
-## Install
-
-Once per machine:
+## Start Here
 
 ```bash
-uv tool install docket
-```
-
-Or with pipx, if that is what you already keep your tools in:
-
-```bash
-pipx install docket
-```
-
-Either one provides two console scripts, `docket` for humans and CI, and `docket-mcp` for agents.
-
-To run an unreleased revision, install from the repository instead:
-
-```bash
-uv tool install git+https://github.com/Sorcerio/Docket
-```
-
-## Deploy into a Repository
-
-```bash
+uv tool install docket # or: pipx install docket
 cd my-project
 docket deploy .
 ```
 
-That creates the ticket directories, writes agent instructions beside them, writes `.docket.toml` at the repository root, and merges a server entry into `.mcp.json`.
-It is idempotent, and it never rewrites an existing `.docket.toml`, because that file holds the key registry.
+Then add at least one key to `.docket.toml` (a ticket cannot exist without one):
 
-Then add your keys, since a ticket cannot be created under a key that does not exist:
-
-```toml
-[keys]
-CORE = "tactical-sim core"
-GEN  = "map generation"
+```bash
+docket key add "CORE" "tactical-sim core"
 ```
 
-Run `docket upgrade .` later to refresh the deployed template and repair the server entry without touching your configuration or your tickets.
+Make your first ticket:
 
-## What a Ticket Looks Like
+```bash
+docket new CORE "Skirmish setup"
+```
+
+## A Ticket
+
+File: `docs/tickets/todo/CORE-14_skirmishSetup.md`
 
 ```markdown
 ---
@@ -78,106 +50,77 @@ title: Skirmish setup
 status: todo
 priority: 1
 requires: [CORE-9, GEN-3]
+metadata: {}
 ---
-
-# Skirmish Setup
 
 Goal: a screen where the player sets up one battle and plays it.
 ```
 
 | Field | Notes |
 |---|---|
-| `id` | `<KEY>-<NUM>`, allocated by scanning existing ids. Must match the filename prefix. |
-| `title` | Free text. May change without renaming the file. |
+| `id` | `<KEY>-<NUM>`. Must match the filename prefix. |
+| `title` | Free text. Changing it does not rename the file. |
 | `status` | `todo`, `wip`, or `done`. Fixed vocabulary. |
-| `priority` | Integer, `0` most urgent. Ceiling is configurable. |
-| `requires` | Ids this ticket depends on. Never lists what it blocks. |
+| `priority` | Integer, `0` most urgent. Ceiling configurable. |
+| `requires` | Ids this depends on. Never lists what it blocks. |
+| `metadata` | Additional freeform key:value pairs handled first-party. |
 
-Any other field is round-tripped untouched, so a repository can extend the schema without a tool change.
-
-The filename is `CORE-14_skirmishSetup.md`, frozen at creation. Retitling does not rename it, because renaming would break every prose cross-reference pointing at it.
-
-## Three Ideas Worth Knowing
-
-- **Dependencies are stored one way.** A ticket declares `requires` and nothing else. Reverse edges are derived by scanning, which makes a one-sided edge impossible rather than merely detectable.
-
-- **Status is the truth and the directory follows it.** Only `done` moves a file. Nothing writes one without the other, and `validate` catches a file that was moved by hand.
-
-- **Keys are closed, and adding one is the user's call.** An unregistered key is refused, so a typo cannot spawn an orphan group. An agent that needs a new key is told to ask first, with `AskUserQuestion`, and only then call `add_key`. The gate is a conversation rather than a queue of proposals to triage later, because in practice a human would never propose a key, they would just add it.
-
-## Docket Runs on Docket
-
-This repository is its own first consumer. Every feature described here arrived as a ticket, and that board is committed beside the code in `docs/tickets/` rather than living in a service somewhere.
-
-So the work is readable in the same place as the result. `docs/tickets/done/` is the history of how the tool got built, one markdown file per piece of it, and `docs/tickets/todo/` is what is coming next. The agent writing the code reads those same files over MCP, which is the whole argument for the format in one repository you can go look at.
+Unknown fields are round-tripped untouched. Filenames are frozen at creation so prose cross-references never break.
 
 ## CLI
 
-A ticket id is the command. Name one and the rest reads as what to do with it.
+> [!IMPORTANT]
+> In Windows PowerShell, the \` character can be treated as an escape character. Typing "Use \`argparse\` instead" produces `\x07`. For code blocks in a body, use the MCP surface or a text editor.
+
+A ticket id is the command:
 
 ```bash
-docket CORE-14                    # show it, dependency context and all
-docket CORE-14 status             # the bare word, for a pipe to read
-docket CORE-14 done               # todo, wip, or done. The file follows
+docket CORE-14         # show it, dependency context and all
+docket CORE-14 status  # bare word, for a pipe
+docket CORE-14 done    # todo, wip, or done. The file follows
 docket CORE-14 set [-t TEXT] [-p N] [-r A,B|none] [-ra A,B] [-rr A,B]
 docket CORE-14 meta [KEY [VALUE]] [-c]
 ```
 
-Everything else works on the set rather than on one ticket.
+Everything else works on the set:
 
 ```bash
 docket new CORE "Skirmish setup" [-r CORE-9,GEN-3] [-p 1] [-b TEXT]
-docket list [todo] [CORE] [2]
 docket list [-s todo] [-k CORE] [-m 2]
-docket graph [CORE-14 | GEN] [-o FILE]
 docket graph [-i CORE-14 | -k GEN] [-o FILE]
-docket key list
-docket key add META "campaign and progression" [-r TEXT]
-docket key remove META
-docket validate
-docket deploy PATH
-docket upgrade PATH
+docket key list | add KEY "desc" [-r TEXT] | remove KEY
+docket validate | deploy PATH | upgrade PATH
 ```
 
-Where a bare token appears above, it is read by its own shape rather than by a flag standing beside it. An id carries a hyphen and a number, a key is uppercase, a status is one of three lowercase words, and a priority is digits, so no token can mean two things and the order they are typed in carries nothing. `docket list todo CORE 2` and `docket list 2 todo CORE` are the same question. The flags are the same filters named explicitly, kept for scripts and for anyone who prefers them, and naming one filter both ways at once is refused rather than resolved in whichever direction the code happens to read.
+`-r` replaces the dependency list. `-ra` and `-rr` edit the one already there. Both in one call is refused.
 
-`docket CORE-14 status` and `docket CORE-14 meta video` both print a bare value with no styling, so a shell can read either as easily as a person can.
-
-Every short flag has a long form: `-k/--key`, `-t/--title`, `-r/--requires`, `-ra/--requires-add`, `-rr/--requires-remove`, `-p/--priority`, `-b/--body`, `-s/--status`, `-m/--priority-max`, `-i/--id`, `-c/--clear`, `-o/--out`, `-r/--rationale`, `-V/--version`.
-
-`-r` replaces the whole dependency list. `-ra` and `-rr` edit the list already there, so changing one entry of a long list does not mean retyping the rest of it. An id already present is not added twice, and one that is not there is removed without complaint. A replacement and an edit in the same call is refused, since it asks for two contradictory things at once.
-
-Where an argument takes one of a discrete set, `--help` lists the set. The keys come from your `[keys]` table and the priorities from `0` through `maxPriority`, so the options shown are the ones this repository actually accepts.
-
-> [!IMPORTANT]
-> In Windows Powershell, the \` character can be contextually treated as _an escape character_!
-> 
-> Typing, "Use \`argparse\` instead", will result in an escaped `a` character as `\x07`.
-> If providing code blocks in a body, use the MCP surface or simply update your ticket body in your favorite text editor.
->
-> The MCP surface, bash, and similar non-Windows terminals _do not_ have this issue.
+Every short flag has a long form (`-k/--key`, `-p/--priority`, `-m/--priority-max`, and so on). `--help` lists your actual keys and priority range.
 
 ## MCP
 
-`docket-mcp` is a stdio server exposing nine tools.
+`docket-mcp` is a stdio server. Nine tools, every one returning JSON as text.
 
 | Tool | Purpose |
 |---|---|
 | `list_tickets(status?, key?, priority_max?)` | Summaries only, never bodies. |
-| `read_ticket(id)` | Full body plus both dependency directions resolved. |
-| `create_ticket(key, title, body?, requires?, priority?)` | Allocates the id and writes the file. |
-| `update_ticket(id, title?, priority?, requires?, requires_add?, requires_remove?)` | Changes only these three fields. `requires` replaces the dependency list, `requires_add` and `requires_remove` edit the one already there. |
-| `set_status(id, status)` | Updates frontmatter and moves the file together. |
-| `graph(id?, key?)` | Returns mermaid source. |
+| `read_ticket(id)` | Full body plus both dependency directions. |
+| `create_ticket(key, title, body?, requires?, priority?)` | Allocates the id, writes the file. |
+| `update_ticket(id, title?, priority?, requires?, requires_add?, requires_remove?)` | Those three fields only. |
+| `set_status(id, status)` | Writes frontmatter and moves the file together. |
+| `graph(id?, key?)` | Mermaid source. |
 | `list_keys()` | The registered keys. |
-| `add_key(key, description, rationale)` | Registers a new key, after the agent has asked the user. |
+| `add_key(key, description, rationale)` | After the agent has asked the user. |
 | `validate()` | Structured findings. |
 
-Every tool returns JSON as text.
+## Key Ticket Rules
+
+1. **Dependencies point one way.** A ticket declares `requires` and nothing else. Reverse edges are derived, so a one-sided edge is impossible rather than merely detectable.
+2. **Status is the truth, the directory follows.** Only `done` moves a file, and nothing writes one without the other. `validate` catches a file moved by hand.
+3. **Keys are a whitelist.** An unregistered key is refused, so a typo cannot spawn an orphan group. A key must be added explicitly before it can be used.
 
 ## Configuration
 
-`.docket.toml` at the repository root.
+`.docket.toml` at the repo root. Read and written with `tomlkit`, so comments, spacing, and key order survive every write like:
 
 ```toml
 root = "docs/tickets"
@@ -188,49 +131,54 @@ maxPriority = 4
 lockTimeout = 5.0
 
 [keys]
+# Primary arch
 CORE = "tactical-sim core"
-
 # The strategic layer is a distinct area.
 META = "campaign and progression"
 ```
 
-A key added through `add_key` or `docket key add --rationale` writes its rationale as the comment above it, and removing the key takes that comment with it.
+A key's rationale becomes the comment above it, and removing the key takes the comment with it. The status vocabulary is deliberately not configurable.
 
-The file is read and written with `tomlkit`, so comments, spacing, and key order survive every write the tool makes.
+`docket deploy` never rewrites an existing `.docket.toml`. Run `docket upgrade .` later to refresh the template and repair the server entry without touching your config or tickets.
 
-The status vocabulary is deliberately not configurable.
+## Concurrent Access
 
-### Concurrent Access
+Writes are serialized across processes through `.docket.lock` at the repo root, which `deploy` adds to your `.gitignore`.
 
-A CLI command and a running MCP server share one repository, and so do two MCP servers pointed at it. Every write is therefore serialized across processes through a lock file at the repository root, `.docket.lock`, which `deploy` and `upgrade` add to your `.gitignore` because it is machine state rather than repository content.
+- Readers share the lock, writers take it exclusively.
+- The whole read-modify-write is held, not just the write. Two processes cannot mint the same id.
+- Files are replaced atomically.
 
-Readers share the lock and writers take it exclusively, so a read is never interrupted by a write. The whole read-modify-write of an operation is held, not just the write, which is what stops two processes minting the same id or one reverting the other's edit. Files are also replaced atomically, so no reader ever sees a half-written ticket even before the lock is considered.
+Config value `lockTimeout` is how long a process waits before giving up. Hitting it raises an error that changed nothing, so the call is always safe to retry.
 
-`lockTimeout` is how many seconds one process waits for another before giving up. Reaching it raises an error that changed nothing, so the call is always safe to retry. Raise it if you run long batches from several processes at once.
+## Validation
 
-## Validation Rules
+`docket validate` errors on:
 
-Errors: a `requires` entry naming an id that does not exist, a dependency cycle, two tickets sharing an id, an unregistered key, an id that disagrees with its filename prefix, a status that disagrees with its directory, a priority outside the band, a status outside the vocabulary, and a file under a status directory that cannot be read as a ticket.
+- A `requires` entry naming an id that does not exist, or a dependency cycle
+- Two tickets sharing an id, or an unregistered key
+- An id disagreeing with its filename prefix, or a status disagreeing with its directory
+- A priority outside the band, or a status outside the vocabulary
+- A file under a status directory that cannot be read as a ticket
 
-`validate` reports no warnings of its own. The warning severity exists for `create_ticket`, which downgrades a `requires` entry naming a ticket that does not exist yet, so a batch written out of order is not stranded halfway. `validate` reports that same dangling entry as an error once the batch is done.
+`validate` has no warnings of its own. That severity exists for `create_ticket`, which downgrades a dangling `requires` entry so a batch written out of order is not stranded halfway.
+
+## Docket Runs on Docket
+
+This repo is its own first consumer. Every feature above arrived as a ticket, committed in `docs/tickets/`. `done/` is the history of how the tool got built, `todo/` is what is next.
 
 ## Development
-
-### Working on the Repo
 
 ```bash
 uv sync
 uv run pytest
 uv run docket --help
+uv tool install --editable --force .  # install your working copy
 ```
 
-The core library holds every rule. The CLI and the MCP server are thin shells over it and contain no logic of their own, which is what keeps the two surfaces from ever disagreeing.
+The core library holds every rule. The CLI and MCP server are thin shells with no logic of their own, which is what keeps the two surfaces from disagreeing.
 
-### Versioning
-
-The version is written in exactly one place, `src/docket/__init__.py`. `pyproject.toml` declares no version of its own and reads that one at build time, the CLI reports it through `--version`, and the MCP server advertises it on connect. Nothing else needs editing.
-
-Bump it with the script rather than by hand, which validates the new version and resyncs the lock file for you:
+The version lives in exactly one place, `src/docket/__init__.py`. Bump it with the script, never by hand, then run `uv sync`:
 
 ```bash
 python scripts/bumpVersion.py patch
@@ -238,21 +186,8 @@ python scripts/bumpVersion.py 0.2.0
 python scripts/bumpVersion.py minor --dry-run
 ```
 
-The version argument is either an explicit semantic version or one of `major`, `minor`, or `patch`. Anything that is not three plain numbers is refused, as is a version that does not come after the current one. `--dry-run` reports the change without writing it.
-
-Run `uv sync` after a bump, since the installed metadata carries the old version until you do.
-
-### Local Installation
-
-You can install Docket as a tool from your repo root:
-
-```bash
-cd /your/repo/root/
-uv tool install --editable --force .
-```
-
 ## License
 
-Docket is licensed under the [GNU General Public License v3.0 or later](LICENSE).
+[GNU GPL v3.0 or later](LICENSE), with an output exception.
 
-That license carries an output exception. Anything Docket writes into your repository is yours under whatever terms you choose, which covers the templates that `deploy` and `upgrade` copy, every ticket file, and every generated artifact. Running Docket against a repository places no obligation of the license on that repository or on anything else in it. The exception reaches only what Docket produces, never Docket's own source.
+Anything Docket writes into your repository is yours under whatever terms you choose: deployed templates, ticket files, generated artifacts. Running Docket against a repository places no license obligation on that repository. The exception reaches only what Docket produces, never Docket's own source.
