@@ -31,12 +31,12 @@ def testVersionIsExposed(capsys: pytest.CaptureFixture[str]) -> None:
 
 def testServerReportsTheSameVersion() -> None:
     """
-    The MCP server advertises the package version rather than the `mcp` library's.
+    The MCP server advertises the package version rather than an empty one.
 
-    `FastMCP` forwards no version to the lowlevel server it wraps, which falls back to reporting its own package's version, so this asserts the assignment that corrects it is still in place.
+    `MCPServer` defaults `version` to the empty string and reports that to a client, so this asserts the constructor is still handed the real one.
     """
 
-    assert server.mcp._mcp_server.version == docket.__version__
+    assert server.mcp.version == docket.__version__
 
 
 def testCliWithNoCommandIsAUsageError() -> None:

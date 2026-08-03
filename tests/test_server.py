@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 import pytest
+from mcp.types import CallToolResult
 
 from docket import server
 
@@ -52,9 +53,9 @@ def callTool(name: str, arguments: dict[str, Any] | None = None) -> Any:
     Returns the decoded JSON payload.
     """
 
-    content, _ = asyncio.run(server.mcp.call_tool(name, arguments or {}))
+    result: CallToolResult = asyncio.run(server.mcp.call_tool(name, arguments or {}))
 
-    return json.loads(content[0].text)
+    return json.loads(result.content[0].text)
 
 
 def toolNames() -> list[str]:
@@ -86,7 +87,7 @@ def testToolNamesAndParametersAreSnakeCase() -> None:
         assert tool.name.islower()
         assert "_" in tool.name or tool.name.isalpha()
 
-        for parameter in tool.inputSchema.get("properties", {}):
+        for parameter in tool.input_schema.get("properties", {}):
             assert parameter == parameter.lower()
             assert not any(character.isupper() for character in parameter)
 
@@ -98,8 +99,8 @@ def testPriorityMaxIsSpelledForTheWire() -> None:
 
     listTickets = [tool for tool in asyncio.run(server.mcp.list_tools()) if tool.name == "list_tickets"][0]
 
-    assert "priority_max" in listTickets.inputSchema["properties"]
-    assert "priorityMax" not in listTickets.inputSchema["properties"]
+    assert "priority_max" in listTickets.input_schema["properties"]
+    assert "priorityMax" not in listTickets.input_schema["properties"]
 
 
 def testCreateTicketDescriptionDirectsTheAgentToListKeys() -> None:
@@ -345,7 +346,7 @@ def testUpdateTicketCannotChangeStatus(inRepo: Path) -> None:
 
     updateTicket = [tool for tool in asyncio.run(server.mcp.list_tools()) if tool.name == "update_ticket"][0]
 
-    assert "status" not in updateTicket.inputSchema["properties"]
+    assert "status" not in updateTicket.input_schema["properties"]
 
 
 def testSetStatusMovesTheFile(inRepo: Path) -> None:
@@ -525,8 +526,8 @@ def testPayloadsAreCompactJson(inRepo: Path) -> None:
 
     callTool("create_ticket", {"key": "CORE", "title": "App shell"})
 
-    content, _ = asyncio.run(server.mcp.call_tool("list_tickets", {}))
-    text: str = content[0].text
+    result: CallToolResult = asyncio.run(server.mcp.call_tool("list_tickets", {}))
+    text: str = result.content[0].text
 
     assert text.startswith('{"count":1')
     assert "\n" not in text
