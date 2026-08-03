@@ -7,10 +7,11 @@ Drive tools through the real MCP dispatch path, covering the wire surface, paylo
 # MARK: Imports
 
 import asyncio
+import inspect
 import json
 import os
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 import pytest
 from mcp.types import CallToolResult
@@ -66,6 +67,38 @@ def toolNames() -> list[str]:
     """
 
     return [tool.name for tool in asyncio.run(server.mcp.list_tools())]
+
+
+def toolHandlers() -> list[Callable[..., Any]]:
+    """
+    Collect the handler functions the tools are registered from.
+
+    `mcp.tool` hands back the function it decorated, so every handler is a plain attribute of the module. Imported names are excluded by the module they were defined in, and `main` is the entry point rather than a tool.
+
+    Returns the handler functions.
+    """
+
+    return [
+        value
+        for name, value in vars(server).items()
+        if inspect.isfunction(value) and value.__module__ == server.__name__ and not name.startswith("_") and name != "main"
+    ]
+
+
+def testEveryHandlerIsAsync() -> None:
+    """
+    `MCPServer` runs a synchronous handler on a worker thread, which would let two calls into the core at once, and every write there reads the ticket set and then writes it back with nothing guarding the gap.
+
+    Two creates would allocate one id twice, two edits would lose one of them, and a read landing mid-write would see a half-written file. Staying on the event loop is what prevents all three, so it is asserted rather than left to whoever adds the eleventh tool.
+    """
+
+    handlers: list[Callable[..., Any]] = toolHandlers()
+
+    # Counting against the registered tools is what makes this catch a new handler instead of only the ones present today.
+    assert len(handlers) == len(toolNames())
+
+    for handler in handlers:
+        assert inspect.iscoroutinefunction(handler), f"{handler.__name__} must be async, or it runs on a worker thread"
 
 
 def testEveryDocumentedToolIsRegistered() -> None:
