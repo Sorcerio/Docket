@@ -1,7 +1,7 @@
 ---
 id: BUG-4
 title: Add to Requires in CLI
-status: todo
+status: done
 priority: 1
 requires: []
 metadata: {}
