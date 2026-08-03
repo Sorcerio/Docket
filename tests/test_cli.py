@@ -260,6 +260,55 @@ def testSetRejectsTheSentinelMixedWithIds(inRepo: Path, capsys: pytest.CaptureFi
     assert "requires: [CORE-1]" in path.read_text(encoding="utf-8")
 
 
+def testSetAddsAndRemovesDependenciesInPlace(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Editing the list in place is what spares a caller from retyping a long one to change a single entry.
+    """
+
+    main(["new", "--key", "CORE", "--title", "First"])
+    main(["new", "--key", "CORE", "--title", "Second"])
+    main(["new", "--key", "CORE", "--title", "Third", "--requires", "CORE-1"])
+    capsys.readouterr()
+
+    path: Path = inRepo / "docs" / "tickets" / "todo" / "CORE-3_third.md"
+
+    assert main(["set", "CORE-3", "--requires-add", "CORE-2"]) == EXIT_OK
+    assert "requires: [CORE-1, CORE-2]" in path.read_text(encoding="utf-8")
+
+    assert main(["set", "CORE-3", "--requires-remove", "CORE-1"]) == EXIT_OK
+    assert "requires: [CORE-2]" in path.read_text(encoding="utf-8")
+
+
+def testSetRefusesReplacingAndEditingAtOnce(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Replacing the list and editing it in one call is contradictory, so the ticket is left as it was.
+    """
+
+    main(["new", "--key", "CORE", "--title", "First"])
+    main(["new", "--key", "CORE", "--title", "Second", "--requires", "CORE-1"])
+    capsys.readouterr()
+
+    assert main(["set", "CORE-2", "--requires", "CORE-1", "--requires-add", "CORE-1"]) == EXIT_USAGE
+    assert "cannot be combined" in capsys.readouterr().err
+
+    path: Path = inRepo / "docs" / "tickets" / "todo" / "CORE-2_second.md"
+
+    assert "requires: [CORE-1]" in path.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("flag", ["--requires-add", "--requires-remove"])
+def testSetRefusesAnEmptyEditList(inRepo: Path, capsys: pytest.CaptureFixture[str], flag: str) -> None:
+    """
+    An edit naming nothing to do is a usage error, since clearing the list is what `--requires` is for.
+    """
+
+    main(["new", "--key", "CORE", "--title", "First"])
+    capsys.readouterr()
+
+    assert main(["set", "CORE-1", flag, "none"]) == EXIT_USAGE
+    assert "needs at least one id" in capsys.readouterr().err
+
+
 @pytest.mark.parametrize("command", [["new", "--key", "CORE", "--title", ""], ["set", "CORE-1", "--title", "   "]])
 def testEmptyTitleIsRefused(inRepo: Path, capsys: pytest.CaptureFixture[str], command: list[str]) -> None:
     """
@@ -691,6 +740,10 @@ def testShorthandFlagsDriveNewAndSet(inRepo: Path, capsys: pytest.CaptureFixture
     assert main(["new", "-k", "CORE", "-t", "Skirmish setup", "-p", "1", "-b", "Goal: one battle."]) == EXIT_OK
     assert main(["new", "-k", "GEN", "-t", "Battlescape", "-r", "CORE-1", "-p", "0"]) == EXIT_OK
     assert main(["set", "GEN-1", "-t", "Renamed", "-p", "3", "-r", "none"]) == EXIT_OK
+
+    # The multi-character shorthands are exact option strings, so neither is read as `-r` carrying a value.
+    assert main(["set", "GEN-1", "-ra", "CORE-1"]) == EXIT_OK
+    assert main(["set", "GEN-1", "-rr", "CORE-1"]) == EXIT_OK
 
     capsys.readouterr()
 

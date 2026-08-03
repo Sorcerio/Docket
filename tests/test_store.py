@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from docket.core.config import Config
-from docket.core.errors import EmptyValueError, InvalidPriorityError, InvalidStatusError, TicketNotFoundError, UnknownKeyError
+from docket.core.errors import ConflictingArgumentsError, EmptyValueError, InvalidPriorityError, InvalidStatusError, TicketNotFoundError, UnknownKeyError
 from docket.core.store import Store, TicketResult, TicketSet
 from docket.core.ticket import Ticket, parseTicket
 
@@ -310,6 +310,115 @@ def testUpdateDoesNotChangeStatus(store: Store) -> None:
     store.create(key="CORE", title="Original")
 
     assert store.update("CORE-1", title="Renamed").ticket.status == "todo"
+
+
+def testUpdateAddsToTheExistingRequires(store: Store, config: Config) -> None:
+    """
+    Adding appends without disturbing what is already there, which is the whole reason it exists.
+    """
+
+    writeRaw(config, "todo", "CORE-1_a.md", makeText("CORE-1"))
+    writeRaw(config, "todo", "CORE-2_b.md", makeText("CORE-2"))
+    store.create(key="CORE", title="Third", requires=["CORE-1"])
+
+    updated: Ticket = store.update("CORE-3", requiresAdd=["CORE-2"]).ticket
+
+    assert updated.requires == ["CORE-1", "CORE-2"]
+
+
+def testUpdateDoesNotAddAnIdAlreadyRequired(store: Store, config: Config) -> None:
+    """
+    An id already in the list is left where it is, so adding twice cannot duplicate an edge.
+    """
+
+    writeRaw(config, "todo", "CORE-1_a.md", makeText("CORE-1"))
+    writeRaw(config, "todo", "CORE-2_b.md", makeText("CORE-2"))
+    store.create(key="CORE", title="Third", requires=["CORE-1", "CORE-2"])
+
+    updated: Ticket = store.update("CORE-3", requiresAdd=["CORE-1"]).ticket
+
+    assert updated.requires == ["CORE-1", "CORE-2"]
+
+
+def testUpdateAddWarnsAboutADanglingId(store: Store) -> None:
+    """
+    An added id naming nothing warns exactly as a created one does, since the same check runs over the final list.
+    """
+
+    store.create(key="CORE", title="First")
+
+    result: TicketResult = store.update("CORE-1", requiresAdd=["GEN-9"])
+
+    assert result.ticket.requires == ["GEN-9"]
+    assert len(result.warnings) == 1
+    assert "GEN-9" in result.warnings[0]
+
+
+def testUpdateRemovesFromTheExistingRequires(store: Store, config: Config) -> None:
+    """
+    Removing drops only what was named, leaving the rest of the list in its original order.
+    """
+
+    writeRaw(config, "todo", "CORE-1_a.md", makeText("CORE-1"))
+    writeRaw(config, "todo", "CORE-2_b.md", makeText("CORE-2"))
+    store.create(key="CORE", title="Third", requires=["CORE-1", "CORE-2"])
+
+    updated: Ticket = store.update("CORE-3", requiresRemove=["CORE-1"]).ticket
+
+    assert updated.requires == ["CORE-2"]
+
+
+def testUpdateRemovingAnAbsentIdIsANoOp(store: Store, config: Config) -> None:
+    """
+    Removing something that is not there leaves the list alone rather than failing, so removal is idempotent.
+    """
+
+    writeRaw(config, "todo", "CORE-1_a.md", makeText("CORE-1"))
+    store.create(key="CORE", title="Second", requires=["CORE-1"])
+
+    result: TicketResult = store.update("CORE-2", requiresRemove=["GEN-4"])
+
+    assert result.ticket.requires == ["CORE-1"]
+    assert result.warnings == []
+
+
+def testUpdateRemovingEverythingLeavesAnEmptyList(store: Store, config: Config) -> None:
+    """
+    Removing the last entry is allowed, landing where a replacement with an empty list would.
+    """
+
+    writeRaw(config, "todo", "CORE-1_a.md", makeText("CORE-1"))
+    store.create(key="CORE", title="Second", requires=["CORE-1"])
+
+    assert store.update("CORE-2", requiresRemove=["CORE-1"]).ticket.requires == []
+
+
+def testUpdateAppliesRemovalBeforeAddition(store: Store, config: Config) -> None:
+    """
+    Removal runs first, so naming one id in both ends with it present rather than gone.
+    """
+
+    writeRaw(config, "todo", "CORE-1_a.md", makeText("CORE-1"))
+    writeRaw(config, "todo", "CORE-2_b.md", makeText("CORE-2"))
+    store.create(key="CORE", title="Third", requires=["CORE-1", "CORE-2"])
+
+    updated: Ticket = store.update("CORE-3", requiresAdd=["CORE-1"], requiresRemove=["CORE-1", "CORE-2"]).ticket
+
+    assert updated.requires == ["CORE-1"]
+
+
+def testUpdateRefusesReplacingAndEditingAtOnce(store: Store) -> None:
+    """
+    A replacement and an edit in one call name no order the caller actually asked for.
+    """
+
+    store.create(key="CORE", title="First")
+
+    with pytest.raises(ConflictingArgumentsError):
+        store.update("CORE-1", requires=["GEN-1"], requiresAdd=["GEN-2"])
+
+    with pytest.raises(ConflictingArgumentsError):
+        store.update("CORE-1", requires=["GEN-1"], requiresRemove=["GEN-2"])
 
 
 def testUpdateRejectsAnUnknownId(store: Store) -> None:

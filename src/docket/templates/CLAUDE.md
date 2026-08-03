@@ -27,6 +27,7 @@ Prose, unparsed and unconstrained.
 | `status` | `todo`, `wip`, or `done`. Nothing else is valid. |
 | `priority` | Integer, `0` most urgent. |
 | `requires` | Ids this ticket depends on. May be empty. |
+| `metadata` | Free-form `{key: value}` map for any tool or skill to attach data to. Namespace your key so it cannot collide with another consumer's. |
 
 Any other field is preserved untouched, so this repository may add its own.
 
@@ -44,6 +45,7 @@ A ticket file has two halves, and they have different rules.
 |---|---|
 | The prose in the body | Edit the file directly |
 | `title`, `priority`, `requires` | `update_ticket` |
+| one `metadata` entry | `set_metadata` |
 | `status` | `set_status` |
 | Nothing, you just want to read it | `read_ticket` |
 
@@ -68,6 +70,8 @@ Filenames are frozen at creation. Retitling a ticket deliberately does not renam
 A ticket declares what it `requires`. It never declares what it blocks.
 
 The reverse direction is derived, not stored. `read_ticket` returns both, so to find out what a ticket is blocking, read it and look at `requiredBy`. Do not add a "blocks" field. Storing both directions guarantees they eventually disagree, which is exactly what this design exists to prevent.
+
+To change one edge, use `update_ticket` with `requires_add` or `requires_remove` rather than reading the list and passing it back with one entry different. Those edit the list in place, so nothing you did not name is at risk. Reserve `requires` for when you genuinely mean to replace the whole list, and never pass it in the same call as an edit, which is refused.
 
 ## Keys are closed
 
