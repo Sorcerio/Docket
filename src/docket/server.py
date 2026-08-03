@@ -12,10 +12,14 @@ This repository's Python is camelCase. The two meet here and nowhere else.
 Each handler is a camelCase Python function carrying an explicit snake_case `name`, its parameters are snake_case because they are the wire format, and the first thing every body does is hand those values to camelCase core calls.
 Neither convention leaks into the other.
 
-Every handler is `async` on purpose. `MCPServer` runs a synchronous handler on a worker thread, which would let two tool calls into `docket.core` at once, and every write there is an unguarded read of the ticket set followed by a write back.
-Concurrent creates would allocate one id twice, concurrent edits would lose one of them, and a read landing mid-write would see a half-written file.
-Declaring the handlers `async` keeps them on the event loop, serialized, which is what this server has always done and what the core is written to assume.
-Nothing here awaits, so this costs an event loop hop and buys back that guarantee.
+Every handler is `async` on purpose. `MCPServer` runs a synchronous handler on a worker thread, which would let two tool calls into `docket.core` at once.
+Declaring the handlers `async` keeps them on the event loop, serialized, which is what this server has always done. Nothing here awaits, so this costs an event loop hop and buys back that guarantee.
+
+That only covers this process. A CLI command, a second server, or a script driving `docket.core` is a separate process the event loop knows nothing about, so `docket.core` holds a lock file across every read and every read-modify-write of its own.
+The two guarantees are independent and both are needed. Neither replaces the other, and the lock is where the real one lives.
+
+A handler that meets a lock held by another process blocks the event loop until it is released or `lockTimeout` elapses. That is deliberate. Moving the wait off the loop would un-serialize the handlers, which is the guarantee the paragraph above exists to keep.
+A timeout surfaces as `LockTimeoutError`, which leaves this module through the same path as every other `DocketError` and reaches the model as a tool error rather than a protocol one.
 """
 
 # MARK: Imports

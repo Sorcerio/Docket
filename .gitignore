@@ -20,3 +20,6 @@ wheels/
 graph.mmd
 scripts/*.ps1
 scripts/*.cmd
+
+# Docket's cross-process lock. Machine state, never committed.
+.docket.lock*

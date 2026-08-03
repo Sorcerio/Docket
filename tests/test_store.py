@@ -15,22 +15,6 @@ from docket.core.errors import ConflictingArgumentsError, EmptyValueError, Inval
 from docket.core.store import Store, TicketResult, TicketSet
 from docket.core.ticket import Ticket, parseTicket
 
-# MARK: Fixtures
-
-
-@pytest.fixture
-def store(config: Config) -> Store:
-    """
-    Build a store over a throwaway repository.
-
-    config: The configuration fixture.
-
-    Returns the store.
-    """
-
-    return Store(config)
-
-
 # MARK: Functions
 
 

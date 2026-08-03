@@ -164,6 +164,7 @@ todoDir = "todo"
 doneDir = "done"
 defaultPriority = 2
 maxPriority = 4
+lockTimeout = 5.0
 
 [keys]
 CORE = "tactical-sim core"
@@ -177,6 +178,14 @@ A key added through `add_key` or `docket key add --rationale` writes its rationa
 The file is read and written with `tomlkit`, so comments, spacing, and key order survive every write the tool makes.
 
 The status vocabulary is deliberately not configurable.
+
+### Concurrent Access
+
+A CLI command and a running MCP server share one repository, and so do two MCP servers pointed at it. Every write is therefore serialized across processes through a lock file at the repository root, `.docket.lock`, which `deploy` and `upgrade` add to your `.gitignore` because it is machine state rather than repository content.
+
+Readers share the lock and writers take it exclusively, so a read is never interrupted by a write. The whole read-modify-write of an operation is held, not just the write, which is what stops two processes minting the same id or one reverting the other's edit. Files are also replaced atomically, so no reader ever sees a half-written ticket even before the lock is considered.
+
+`lockTimeout` is how many seconds one process waits for another before giving up. Reaching it raises an error that changed nothing, so the call is always safe to retry. Raise it if you run long batches from several processes at once.
 
 ## Validation Rules
 
