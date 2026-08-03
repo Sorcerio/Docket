@@ -1,7 +1,7 @@
 ---
 id: FEAT-10
 title: Tree Style CLI Commands
-status: todo
+status: done
 priority: 2
 requires: []
 metadata: {}
