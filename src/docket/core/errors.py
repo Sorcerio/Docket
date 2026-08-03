@@ -45,6 +45,14 @@ class InvalidIdError(DocketError):
     """
 
 
+class InvalidArgumentError(DocketError):
+    """
+    Raised when an argument's value cannot be read as anything that argument accepts.
+
+    A shell that takes bare positional tokens needs this, since which filter a token names is decided by the token's own shape rather than by a flag standing beside it.
+    """
+
+
 class DeployError(DocketError):
     """
     Raised when docket cannot be installed into a consumer repository.

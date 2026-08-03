@@ -19,3 +19,4 @@ wheels/
 .videos/
 graph.mmd
 scripts/*.ps1
+scripts/*.cmd

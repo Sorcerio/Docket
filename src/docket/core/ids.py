@@ -60,6 +60,20 @@ def requireValidKey(key: str) -> str:
     return key
 
 
+def isValidId(ticketId: str) -> bool:
+    """
+    Report whether a ticket id matches the required form.
+
+    This is the asking half of `parseId`, for a caller deciding what a token is rather than one that already knows.
+
+    ticketId: The id to test.
+
+    Returns `True` when the id is well formed.
+    """
+
+    return bool(ID_PATTERN.match(ticketId))
+
+
 def parseId(ticketId: str) -> tuple[str, int]:
     """
     Split a ticket id into its key and its number.

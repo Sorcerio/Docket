@@ -92,12 +92,23 @@ The filename is `CORE-14_skirmishSetup.md`, frozen at creation. Retitling does n
 
 ## CLI
 
+A ticket id is the command. Name one and the rest reads as what to do with it.
+
 ```bash
-docket new -k CORE -t "Skirmish setup" [-r CORE-9,GEN-3] [-p 1] [-b TEXT]
-docket show CORE-14
+docket CORE-14                    # show it, dependency context and all
+docket CORE-14 status             # the bare word, for a pipe to read
+docket CORE-14 done               # todo, wip, or done. The file follows
+docket CORE-14 set [-t TEXT] [-p N] [-r A,B|none] [-ra A,B] [-rr A,B]
+docket CORE-14 meta [KEY [VALUE]] [-c]
+```
+
+Everything else works on the set rather than on one ticket.
+
+```bash
+docket new CORE "Skirmish setup" [-r CORE-9,GEN-3] [-p 1] [-b TEXT]
+docket list [todo] [CORE] [2]
 docket list [-s todo] [-k CORE] [-m 2]
-docket set CORE-14 [-t TEXT] [-p N] [-r A,B|none] [-ra A,B] [-rr A,B]
-docket status CORE-14 done
+docket graph [CORE-14 | GEN] [-o FILE]
 docket graph [-i CORE-14 | -k GEN] [-o FILE]
 docket key list
 docket key add META "campaign and progression" [-r TEXT]
@@ -107,7 +118,11 @@ docket deploy PATH
 docket upgrade PATH
 ```
 
-Every short flag has a long form: `-k/--key`, `-t/--title`, `-r/--requires`, `-ra/--requires-add`, `-rr/--requires-remove`, `-p/--priority`, `-b/--body`, `-s/--status`, `-m/--priority-max`, `-i/--id`, `-o/--out`, `-r/--rationale`, `-V/--version`.
+Where a bare token appears above, it is read by its own shape rather than by a flag standing beside it. An id carries a hyphen and a number, a key is uppercase, a status is one of three lowercase words, and a priority is digits, so no token can mean two things and the order they are typed in carries nothing. `docket list todo CORE 2` and `docket list 2 todo CORE` are the same question. The flags are the same filters named explicitly, kept for scripts and for anyone who prefers them, and naming one filter both ways at once is refused rather than resolved in whichever direction the code happens to read.
+
+`docket CORE-14 status` and `docket CORE-14 meta video` both print a bare value with no styling, so a shell can read either as easily as a person can.
+
+Every short flag has a long form: `-k/--key`, `-t/--title`, `-r/--requires`, `-ra/--requires-add`, `-rr/--requires-remove`, `-p/--priority`, `-b/--body`, `-s/--status`, `-m/--priority-max`, `-i/--id`, `-c/--clear`, `-o/--out`, `-r/--rationale`, `-V/--version`.
 
 `-r` replaces the whole dependency list. `-ra` and `-rr` edit the list already there, so changing one entry of a long list does not mean retyping the rest of it. An id already present is not added twice, and one that is not there is removed without complaint. A replacement and an edit in the same call is refused, since it asks for two contradictory things at once.
 
