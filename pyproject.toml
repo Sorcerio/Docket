@@ -1,5 +1,5 @@
 [project]
-name = "docket"
+name = "ticket-docket"
 dynamic = ["version"]
 description = "A per-repo ticketing system that is plain markdown for humans and structured MCP for agents"
 readme = "README.md"

@@ -22,12 +22,14 @@ Markdown tickets that live in your repo. You read them in a text editor or CLI. 
 ## Start Here
 
 ```bash
-uv tool install docket # or: pipx install docket
+uv tool install ticket-docket  # or: pipx install ticket-docket
 cd my-project
 docket deploy .
 ```
 
-Then add at least one key to `.docket.toml` (a ticket cannot exist without one):
+This installs two commands: `docket` for you and `docket-mcp` for your agent.
+
+Then add at least one project key to `.docket.toml` for your future tickets:
 
 ```bash
 docket key add "CORE" "tactical-sim core"
