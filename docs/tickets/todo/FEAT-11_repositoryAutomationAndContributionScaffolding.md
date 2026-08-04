@@ -52,3 +52,13 @@ The demo GIF is served to PyPI from `raw.githubusercontent.com` on the `master` 
 **The release job verifies the tag against `__version__` before building.** A version number is spent the moment PyPI accepts it, so a mismatch has to fail before the upload rather than after.
 
 **This is a patch bump, not a minor.** Nothing under `src/` changed.
+
+## What the Matrix Found
+
+The suite was believed to have no platform specific assertions. It had one, and the Ubuntu leg found it on the first run.
+
+`testAMissingConfigurationIsReportedClearly` asserted `"docket deploy"` appeared in stderr. The message names the recovery command correctly on both platforms, but `rich` falls back to eighty columns when its output is not a terminal, and the message embeds the temporary directory path. That path is longer on Linux than on Windows, so the wrap landed mid phrase and split `docket deploy` across two lines on Ubuntu only.
+
+The assertion was about content and the failure was about layout, so the fix was to make layout deterministic rather than to loosen the assertion. `tests/conftest.py` gained an autouse fixture pinning `COLUMNS` to 400 for every test, which is wider than any message this suite asserts against. That removes the whole class of latent breakage, not just the one instance, since roughly a dozen other assertions look for multi word phrases that a differently sized path could have split the same way.
+
+Nothing under `src/` changed. The message was always correct.
