@@ -53,6 +53,8 @@ The demo GIF is served to PyPI from `raw.githubusercontent.com` on the `master` 
 
 **This is a patch bump, not a minor.** Nothing under `src/` changed.
 
+**Dependabot was added beyond the ticket's scope.** The action pins written for this ticket were already two majors behind the day they were written, which is the argument for the file rather than against it. `.github/dependabot.yml` watches the `github-actions` and `uv` ecosystems weekly. Actions are pinned to a major tag, so a pull request only appears on a new major rather than on every patch.
+
 ## What the Matrix Found
 
 The suite was believed to have no platform specific assertions. It had one, and the Ubuntu leg found it on the first run.

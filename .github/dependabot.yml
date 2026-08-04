@@ -1,0 +1,23 @@
+version: 2
+
+updates:
+  # Workflow actions are pinned to a major tag, so this only opens a pull request when one ships a new major.
+  # Without it, a pin sits at whatever was current the day it was written and nobody notices.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "dependencies"
+
+  # Runtime and development dependencies, read from `pyproject.toml` and `uv.lock`.
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps"
+    labels:
+      - "dependencies"

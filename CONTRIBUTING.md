@@ -129,6 +129,8 @@ Beyond that:
 - Mark the ticket `done` in the same pull request.
 - Both workflows must be green.
 
+Dependabot opens its own pull requests weekly for workflow actions and for dependencies.
+
 ## Releases
 
 Releases are automatic and there is no PyPI token anywhere.
