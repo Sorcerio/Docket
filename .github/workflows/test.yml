@@ -1,0 +1,33 @@
+name: Test
+
+# Also callable by `release.yml`, so a tag cannot publish without this exact suite passing on that exact commit.
+on:
+  pull_request:
+  workflow_call:
+
+jobs:
+  pytest:
+    name: pytest (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      # Run every leg to completion, because a Windows-only failure is the thing this matrix exists to find.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # It's in their docs to do this...
+        with:
+          enable-cache: true
+
+      - name: Install the project
+        # `--locked` fails rather than resolving, so a lock file that has drifted from `pyproject.toml` is caught here instead of at release.
+        run: uv sync --locked
+
+      - name: Run the test suite
+        run: uv run pytest

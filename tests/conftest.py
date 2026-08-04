@@ -33,7 +33,23 @@ HEAD = "Godot frontend and seam"
 META = "campaign and progression"
 """
 
+# How wide `rich` renders during tests, in columns.
+CONSOLE_WIDTH: str = "400" # Avoids word wraps
+
 # MARK: Fixtures
+
+
+@pytest.fixture(autouse=True)
+def fixedConsoleWidth(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Pin the width `rich` renders to for every test.
+
+    Captured output is not a terminal, so `rich` falls back to eighty columns and wraps. Several messages embed a temporary path whose length differs by platform, which moves where that wrap lands and can split a phrase an assertion is looking for across two lines. Pinning the width makes rendered output identical everywhere.
+
+    monkeypatch: The pytest-provided environment patcher.
+    """
+
+    monkeypatch.setenv("COLUMNS", CONSOLE_WIDTH)
 
 
 @pytest.fixture
