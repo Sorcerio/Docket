@@ -1,9 +1,33 @@
 [project]
-name = "docket"
+name = "ticket-docket"
 dynamic = ["version"]
 description = "A per-repo ticketing system that is plain markdown for humans and structured MCP for agents"
 readme = "README.md"
 requires-python = ">=3.12"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "Sorcerio" }]
+keywords = [
+    "tickets",
+    "issue-tracker",
+    "project-management",
+    "mcp",
+    "agents",
+    "markdown",
+    "cli",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Bug Tracking",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
 dependencies = [
     "filelock>=3.32.2",
     "mcp>=2,<3",
@@ -12,6 +36,11 @@ dependencies = [
     "rich-argparse>=1.8.0",
     "tomlkit>=0.15.1",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Sorcerio/Docket"
+Repository = "https://github.com/Sorcerio/Docket"
+Issues = "https://github.com/Sorcerio/Docket/issues"
 
 [project.scripts]
 docket = "docket.cli:main"
@@ -27,10 +56,22 @@ path = "src/docket/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/docket"]
 
+# Exclude non-required files from the wheel distribution
+[tool.hatch.build.targets.sdist]
+include = [
+    "src",
+    "tests",
+    "scripts",
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "twine>=6.1.0",
 ]

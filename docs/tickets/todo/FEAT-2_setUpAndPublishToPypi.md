@@ -3,7 +3,7 @@ id: FEAT-2
 title: Set up and publish to PyPI
 status: todo
 priority: 3
-requires: [BUG-1, BUG-2, FEAT-4, FEAT-5, FEAT-7, BUG-3, BUG-4, FEAT-10, BUG-5]
+requires: [BUG-1, BUG-2, FEAT-4, FEAT-5, FEAT-7, BUG-3, BUG-4, FEAT-10, BUG-5, FEAT-1]
 metadata: {}
 ---
 
