@@ -56,10 +56,22 @@ path = "src/docket/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/docket"]
 
+# Exclude non-required files from the wheel distribution
+[tool.hatch.build.targets.sdist]
+include = [
+    "src",
+    "tests",
+    "scripts",
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "twine>=6.1.0",
 ]

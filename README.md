@@ -98,7 +98,7 @@ Every short flag has a long form (`-k/--key`, `-p/--priority`, `-m/--priority-ma
 
 ## MCP
 
-`docket-mcp` is a stdio server. Nine tools, every one returning JSON as text.
+`docket-mcp` is a stdio server. Ten tools, each returning JSON as text.
 
 | Tool | Purpose |
 |---|---|
@@ -111,6 +111,7 @@ Every short flag has a long form (`-k/--key`, `-p/--priority`, `-m/--priority-ma
 | `list_keys()` | The registered keys. |
 | `add_key(key, description, rationale)` | After the agent has asked the user. |
 | `validate()` | Structured findings. |
+| `set_metadata(id, key, value?)` | One entry at a time, leaving every other key alone. |
 
 ## Key Ticket Rules
 
@@ -188,6 +189,6 @@ python scripts/bumpVersion.py minor --dry-run
 
 ## License
 
-[GNU GPL v3.0 or later](LICENSE), with an output exception.
+[GNU GPL v3.0 or later](https://github.com/Sorcerio/Docket/blob/master/LICENSE), with an output exception.
 
 Anything Docket writes into your repository is yours under whatever terms you choose: deployed templates, ticket files, generated artifacts. Running Docket against a repository places no license obligation on that repository. The exception reaches only what Docket produces, never Docket's own source.

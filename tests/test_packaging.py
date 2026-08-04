@@ -1,13 +1,16 @@
 """
 Packaging Tests
 
-Verify the package imports, that both console script entry points are callable, and that every surface reports one version.
+Verify the package imports, that both console script entry points are callable, that every surface reports one version, and that the built artifacts carry what they should.
 """
 
 # MARK: Imports
 
 import asyncio
 import sys
+import tomllib
+from pathlib import Path
+from typing import Any
 
 import pytest
 from mcp import ClientSession
@@ -21,6 +24,25 @@ from docket import cli, server
 
 # A handshake that has not answered by now is hung, and a hung test is worse than a failing one.
 HANDSHAKE_TIMEOUT: float = 30.0
+
+# The repository root, two levels up from this file.
+REPO_ROOT: Path = Path(__file__).resolve().parent.parent
+
+# Files the package ships that are not Python, so no import failure would ever reveal them missing.
+PACKAGE_DATA_FILES: tuple[str, ...] = (
+    "py.typed",
+    "templates/CLAUDE.md",
+    "templates/docket.toml",
+)
+
+# Directories that must never reach the source distribution, because they are development state rather than source.
+SDIST_FORBIDDEN: tuple[str, ...] = (
+    "docs",
+    ".claude",
+    ".videos",
+    "uv.lock",
+    "main.py",
+)
 
 # MARK: Functions
 
@@ -82,6 +104,58 @@ def testHandshakeAdvertisesThePackageVersion() -> None:
 
     # The instructions are what an agent reads before its first call, so a handshake that drops them is a broken one.
     assert result.instructions == server.SERVER_INSTRUCTIONS
+
+
+@pytest.mark.parametrize("relativePath", PACKAGE_DATA_FILES)
+def testPackageDataFilesAreShipped(relativePath: str) -> None:
+    """
+    Every non-Python file the package depends on sits inside the package directory.
+
+    Anything outside `src/docket` is left behind by the wheel build, and `deploy` would then fail only once installed rather than in the test suite.
+
+    relativePath: A path inside the package directory, relative to it.
+    """
+
+    assert (REPO_ROOT / "src" / "docket" / relativePath).is_file()
+
+
+def testSdistShipsSourceAndItsVerification() -> None:
+    """
+    The source distribution carries the source, the tests, and the scripts the tests reach for.
+
+    `tests/test_bumpVersion.py` loads `scripts/bumpVersion.py` by path, so dropping the scripts would leave an unpacked sdist unable to run its own suite.
+    """
+
+    include: list[str] = _readSdistInclude()
+
+    for required in ("src", "tests", "scripts", "README.md", "LICENSE", "pyproject.toml"):
+        assert required in include
+
+
+@pytest.mark.parametrize("entry", SDIST_FORBIDDEN)
+def testSdistExcludesDevelopmentState(entry: str) -> None:
+    """
+    Development state stays out of the source distribution.
+
+    Hatchling ships every tracked file unless told otherwise, which would publish the demo recording, the ticket board, and the agent configuration to an index that never forgets a release.
+
+    entry: A path that must not appear in the include list.
+    """
+
+    assert entry not in _readSdistInclude()
+
+
+def _readSdistInclude() -> list[str]:
+    """
+    Read the source distribution include list out of `pyproject.toml`.
+
+    Returns the configured include entries.
+    """
+
+    with (REPO_ROOT / "pyproject.toml").open("rb") as file:
+        configuration: dict[str, Any] = tomllib.load(file)
+
+    return configuration["tool"]["hatch"]["build"]["targets"]["sdist"]["include"]
 
 
 async def _initializeOverStdio() -> InitializeResult:
