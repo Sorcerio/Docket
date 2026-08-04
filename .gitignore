@@ -10,6 +10,7 @@ wheels/
 .venv
 
 # Systems
+.env
 .DS_Store
 .claude/settings.local.json
 .claude/commands/
