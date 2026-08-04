@@ -1,13 +1,14 @@
 # docket
 
+![Docket banner](https://raw.githubusercontent.com/Sorcerio/Docket/master/docs/logo/docket_banner.jpg)
+
 [![Test](https://github.com/Sorcerio/Docket/actions/workflows/test.yml/badge.svg)](https://github.com/Sorcerio/Docket/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/ticket-docket)](https://pypi.org/project/ticket-docket/)
 
 Markdown tickets that live in your repo. You read them in a text editor or CLI. Your agent reads them over MCP.
 
-![Docket demo](https://raw.githubusercontent.com/Sorcerio/Docket/master/docs/demo/docket.gif)
-
 * [docket](#docket)
+    * [Demo](#demo)
     * [Start Here](#start-here)
     * [A Ticket](#a-ticket)
     * [CLI](#cli)
@@ -21,6 +22,10 @@ Markdown tickets that live in your repo. You read them in a text editor or CLI. 
     * [License](#license)
 
 ---
+
+## Demo
+
+![Docket demo](https://raw.githubusercontent.com/Sorcerio/Docket/master/docs/demo/docket.gif)
 
 ## Start Here
 
