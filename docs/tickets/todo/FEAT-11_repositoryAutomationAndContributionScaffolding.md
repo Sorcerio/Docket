@@ -38,3 +38,17 @@ The release sequence today is documented in FEAT-2. This turns steps 2 through 7
 ## Notes
 
 The demo GIF is served to PyPI from `raw.githubusercontent.com` on the `master` branch. Renaming that branch or moving `docs/demo/docket.gif` breaks the image on every already-published release, permanently, because a published release's README can never be edited.
+
+## Decisions Made During Implementation
+
+**Tags are bare numeric, not `v` prefixed.** This ticket asked for a `v*` trigger, but `1.0.0` was already tagged and published without a prefix, and a `v*` glob would never have matched it. `release.yml` triggers on `[0-9]*.[0-9]*.[0-9]*` so the tag history stays one convention rather than two. `CONTRIBUTING.md` states this.
+
+**The matrix is Ubuntu and Windows on Python 3.12.** The ticket asked for at least those two operating systems. macOS and 3.13 were considered and dropped as breadth without a specific question behind them.
+
+**The gate is a reusable workflow, not `workflow_run`.** `test.yml` carries a `workflow_call` trigger and `release.yml` calls it as a job that the publish job `needs`. One definition of the suite, and a tag cannot publish without it passing on that exact commit.
+
+**Issues stay open as intake.** The board in `docs/tickets/` remains the tracker. The issue templates are shaped to the `BUG` and `FEAT` keys so an accepted issue converts into a ticket without being rewritten, and an issue closes when its ticket does.
+
+**The release job verifies the tag against `__version__` before building.** A version number is spent the moment PyPI accepts it, so a mismatch has to fail before the upload rather than after.
+
+**This is a patch bump, not a minor.** Nothing under `src/` changed.

@@ -1,5 +1,8 @@
 # docket
 
+[![Test](https://github.com/Sorcerio/Docket/actions/workflows/test.yml/badge.svg)](https://github.com/Sorcerio/Docket/actions/workflows/test.yml)
+[![PyPI](https://img.shields.io/pypi/v/ticket-docket)](https://pypi.org/project/ticket-docket/)
+
 Markdown tickets that live in your repo. You read them in a text editor or CLI. Your agent reads them over MCP.
 
 ![Docket demo](https://raw.githubusercontent.com/Sorcerio/Docket/master/docs/demo/docket.gif)
@@ -181,13 +184,7 @@ uv tool install --editable --force .  # install your working copy
 
 The core library holds every rule. The CLI and MCP server are thin shells with no logic of their own, which is what keeps the two surfaces from disagreeing.
 
-The version lives in exactly one place, `src/docket/__init__.py`. Bump it with the script, never by hand, then run `uv sync`:
-
-```bash
-python scripts/bumpVersion.py patch
-python scripts/bumpVersion.py 0.2.0
-python scripts/bumpVersion.py minor --dry-run
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full details.
 
 ## License
 
