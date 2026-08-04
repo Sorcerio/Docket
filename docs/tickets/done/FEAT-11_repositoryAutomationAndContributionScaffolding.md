@@ -1,7 +1,7 @@
 ---
 id: FEAT-11
 title: Repository automation and contribution scaffolding
-status: todo
+status: done
 priority: 3
 requires: [FEAT-2]
 metadata: {}

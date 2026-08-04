@@ -2,7 +2,6 @@ name: Test
 
 # Also callable by `release.yml`, so a tag cannot publish without this exact suite passing on that exact commit.
 on:
-  push:
   pull_request:
   workflow_call:
 
