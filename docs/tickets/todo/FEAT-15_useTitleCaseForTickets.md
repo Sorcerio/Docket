@@ -11,6 +11,6 @@ metadata: {}
 
 Add a *script level* enforcement of proper title case for ticket titles.
 
-Filenames remain the camelCase setup as before. This only applies to titles within the `title` key and the first automatically added header.
+Filenames remain the camelCase setup as before. This only applies to titles within the `title` key.
 
-Existing titles in the `title` key and the first automatically added header (if possible) are checked for proper title case when `validate` is run. Any non-compliant titles will be flagged with a *warning* that includes what the title should look like. The intention is that running `validate` will be useful to both a human operator and an MCP agent operator to correct any existing non-compliant titles.
+Existing titles in the `title` key is checked for proper title case when `validate` is run. Any non-compliant titles will be flagged with a *warning* that includes what the title should look like. The intention is that running `validate` will be useful to both a human operator and an MCP agent operator to correct any existing non-compliant titles.
