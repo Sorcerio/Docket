@@ -16,6 +16,7 @@ from docket.core.errors import ConflictingArgumentsError, InvalidPriorityError, 
 from docket.core.ids import buildFilename, nextId, parseId, requireValidKey
 from docket.core.inputs import requireText
 from docket.core.ticket import STATUS_DONE, STATUSES, Ticket, buildBody, parseTicket, serializeTicket
+from docket.core.titles import toTitleCase
 
 # MARK: Constants
 
@@ -292,7 +293,7 @@ class Store:
         The id is derived by scanning what already exists, so the scan and the write are held together under one lock. Without that, two processes minting under one key read the same set and allocate the same number.
 
         key: The key to mint under, which must be registered.
-        title: The ticket title, which the filename slug derives from once, here.
+        title: The ticket title, converted to title case before anything derives from it.
         body: Prose for the body, placed under a heading built from the title.
         requires: Ids this ticket depends on.
         priority: The priority, defaulting to the configuration's `defaultPriority`.
@@ -302,6 +303,9 @@ class Store:
 
         # The filename slug derives from the title once, here, so an empty one is frozen into the filename as well as the field.
         requireText(title, "title")
+
+        # Convert before the id is allocated, so the slug and the body heading are both built from the title that actually gets stored.
+        casedTitle: str = toTitleCase(title)
 
         # A key must be registered before anything is minted under it, and the error names `add_key` as the way out.
         requireValidKey(key)
@@ -315,11 +319,11 @@ class Store:
 
             ticket: Ticket = Ticket(
                 id=nextId(key, existing.ids()),
-                title=title,
+                title=casedTitle,
                 status=STATUSES[0],
                 priority=resolvedPriority,
                 requires=list(requires or []),
-                body=buildBody(title, body),
+                body=buildBody(casedTitle, body),
             )
 
             return TicketResult(ticket=self.write(ticket), warnings=self.__danglingWarnings(ticket, existing))
@@ -343,7 +347,7 @@ class Store:
         The load and the write back are held together under one lock, since a second process changing a different field in the gap would have its change reverted by this write.
 
         ticketId: The ticket to change.
-        title: A new title, if any.
+        title: A new title, converted to title case, if any.
         priority: A new priority, if any.
         requires: A replacement dependency list, if any.
         requiresAdd: Ids to append to the existing list, if any.
@@ -361,7 +365,7 @@ class Store:
             ticket: Ticket = existing.get(ticketId)
 
             if title is not None:
-                ticket.title = requireText(title, "title")
+                ticket.title = toTitleCase(requireText(title, "title"))
 
             if priority is not None:
                 self.__requireValidPriority(priority)
