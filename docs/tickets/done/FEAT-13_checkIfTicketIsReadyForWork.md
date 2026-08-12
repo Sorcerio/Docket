@@ -1,6 +1,6 @@
 ---
 id: FEAT-13
-title: Check if Ticket is Ready For Work
+title: Check if Ticket Is Ready for Work
 status: done
 priority: 1
 requires: []

@@ -1,7 +1,7 @@
 ---
 id: FEAT-15
 title: Use Title Case for Tickets
-status: todo
+status: done
 priority: 1
 requires: []
 metadata: {}

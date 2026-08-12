@@ -56,7 +56,7 @@ File: `docs/tickets/todo/CORE-14_skirmishSetup.md`
 ```markdown
 ---
 id: CORE-14
-title: Skirmish setup
+title: Skirmish Setup
 status: todo
 priority: 1
 requires: [CORE-9, GEN-3]
@@ -69,7 +69,7 @@ Goal: a screen where the player sets up one battle and plays it.
 | Field | Notes |
 |---|---|
 | `id` | `<KEY>-<NUM>`. Must match the filename prefix. |
-| `title` | Free text. Changing it does not rename the file. |
+| `title` | Free text, converted to title case on write. Changing it does not rename the file. |
 | `status` | `todo`, `wip`, or `done`. Fixed vocabulary. |
 | `priority` | Integer, `0` most urgent. Ceiling configurable. |
 | `requires` | Ids this depends on. Never lists what it blocks. |
@@ -168,15 +168,14 @@ Config value `lockTimeout` is how long a process waits before giving up. Hitting
 
 ## Validation
 
-`docket validate` errors on:
+`docket validate` presents an error or warning when:
 
-- A `requires` entry naming an id that does not exist, or a dependency cycle
-- Two tickets sharing an id, or an unregistered key
-- An id disagreeing with its filename prefix, or a status disagreeing with its directory
-- A priority outside the band, or a status outside the vocabulary
-- A file under a status directory that cannot be read as a ticket
-
-`validate` has no warnings of its own. That severity exists for `create_ticket`, which downgrades a dangling `requires` entry so a batch written out of order is not stranded halfway.
+- A `requires` entry naming an id that does not exist, or a dependency cycle.
+- Two tickets sharing an id, or an unregistered key.
+- An id disagreeing with its filename prefix, or a status disagreeing with its directory.
+- A priority outside the band, or a status outside the vocabulary.
+- A file under a status directory that cannot be read as a ticket.
+- A ticket's title is not in the valid title format.
 
 ## Docket Runs on Docket
 

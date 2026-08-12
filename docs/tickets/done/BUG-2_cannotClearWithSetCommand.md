@@ -1,9 +1,10 @@
 ---
 id: BUG-2
-title: Cannot Clear With Set Command
+title: Cannot Clear with Set Command
 status: done
 priority: 0
 requires: []
+metadata: {}
 ---
 
 # Cannot Clear With Set Command

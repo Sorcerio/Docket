@@ -74,7 +74,7 @@ def testNewCreatesATicket(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> N
     The key and the title are positional, since both are required and a required flag is a flag that should have been an argument.
     """
 
-    assert main(["new", "CORE", "Skirmish setup", "--body", "Goal: one battle."]) == EXIT_OK
+    assert main(["new", "CORE", "Skirmish Setup", "--body", "Goal: one battle."]) == EXIT_OK
 
     assert "CORE-1" in capsys.readouterr().out
     assert (inRepo / "docs" / "tickets" / "todo" / "CORE-1_skirmishSetup.md").is_file()
@@ -108,14 +108,14 @@ def testABareIdShowsTheTicket(inRepo: Path, capsys: pytest.CaptureFixture[str]) 
     Naming a ticket and nothing else means showing it, since that is what naming one almost always means.
     """
 
-    main(["new", "CORE", "App shell"])
+    main(["new", "CORE", "App Shell"])
     capsys.readouterr()
 
     assert main(["CORE-1"]) == EXIT_OK
 
     out: str = capsys.readouterr().out
 
-    assert "App shell" in out
+    assert "App Shell" in out
     assert "Requires" in out
 
 
@@ -124,7 +124,7 @@ def testShowIsTheSpelledOutFormOfABareId(inRepo: Path, capsys: pytest.CaptureFix
     The default action has a name, so it can be documented and typed rather than only implied.
     """
 
-    main(["new", "CORE", "App shell"])
+    main(["new", "CORE", "App Shell"])
     capsys.readouterr()
 
     main(["CORE-1"])
@@ -139,8 +139,8 @@ def testShowResolvesBothDependencyDirections(inRepo: Path, capsys: pytest.Captur
     The raw file stores forward edges only, so `show` has to supply the reverse side and the titles.
     """
 
-    main(["new", "CORE", "App shell"])
-    main(["new", "CORE", "Skirmish setup", "--requires", "CORE-1"])
+    main(["new", "CORE", "App Shell"])
+    main(["new", "CORE", "Skirmish Setup", "--requires", "CORE-1"])
     capsys.readouterr()
 
     assert main(["CORE-1", "show"]) == EXIT_OK
@@ -148,7 +148,7 @@ def testShowResolvesBothDependencyDirections(inRepo: Path, capsys: pytest.Captur
     out: str = capsys.readouterr().out
 
     assert "Required by" in out
-    assert "Skirmish setup" in out
+    assert "Skirmish Setup" in out
 
 
 def testShowDisplaysTheBody(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -156,7 +156,7 @@ def testShowDisplaysTheBody(inRepo: Path, capsys: pytest.CaptureFixture[str]) ->
     `show` prints the prose along with the context, rather than the raw file.
     """
 
-    main(["new", "CORE", "App shell", "--body", "Goal: a window that opens."])
+    main(["new", "CORE", "App Shell", "--body", "Goal: a window that opens."])
     capsys.readouterr()
 
     main(["CORE-1", "show"])
@@ -210,15 +210,15 @@ def testListFiltersCombine(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> 
     Each supplied filter narrows the result.
     """
 
-    main(["new", "CORE", "Core work", "--priority", "0"])
-    main(["new", "GEN", "Gen work", "--priority", "4"])
+    main(["new", "CORE", "Core Work", "--priority", "0"])
+    main(["new", "GEN", "Gen Work", "--priority", "4"])
     capsys.readouterr()
 
     main(["list", "--key", "CORE"])
-    assert "Gen work" not in capsys.readouterr().out
+    assert "Gen Work" not in capsys.readouterr().out
 
     main(["list", "--priority-max", "0"])
-    assert "Gen work" not in capsys.readouterr().out
+    assert "Gen Work" not in capsys.readouterr().out
 
 
 def testListFiltersFromBareTokens(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -226,16 +226,16 @@ def testListFiltersFromBareTokens(inRepo: Path, capsys: pytest.CaptureFixture[st
     A token says which filter it is by its own shape, so the three can be typed in any order with no flags between them.
     """
 
-    main(["new", "CORE", "Core work", "--priority", "0"])
-    main(["new", "GEN", "Gen work", "--priority", "4"])
+    main(["new", "CORE", "Core Work", "--priority", "0"])
+    main(["new", "GEN", "Gen Work", "--priority", "4"])
     capsys.readouterr()
 
     assert main(["list", "todo", "CORE", "0"]) == EXIT_OK
 
     out: str = capsys.readouterr().out
 
-    assert "Core work" in out
-    assert "Gen work" not in out
+    assert "Core Work" in out
+    assert "Gen Work" not in out
 
     # Order carries no meaning, since each token is classified on its own.
     assert main(["list", "0", "todo", "CORE"]) == EXIT_OK
@@ -247,16 +247,16 @@ def testListTakesTokensAndFlagsTogether(inRepo: Path, capsys: pytest.CaptureFixt
     The flags remain the explicit form of the same three filters, so mixing the two spellings is fine as long as they name different filters.
     """
 
-    main(["new", "CORE", "Core work", "--priority", "0"])
-    main(["new", "GEN", "Gen work", "--priority", "4"])
+    main(["new", "CORE", "Core Work", "--priority", "0"])
+    main(["new", "GEN", "Gen Work", "--priority", "4"])
     capsys.readouterr()
 
     assert main(["list", "CORE", "--status", "todo"]) == EXIT_OK
 
     out: str = capsys.readouterr().out
 
-    assert "Core work" in out
-    assert "Gen work" not in out
+    assert "Core Work" in out
+    assert "Gen Work" not in out
 
 
 def testListRefusesATokenItCannotRead(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -307,7 +307,7 @@ def testSetChangesFieldsWithoutRenamingTheFile(inRepo: Path, capsys: pytest.Capt
     Retitling must not rename the file, since that would break every prose cross-reference.
     """
 
-    main(["new", "CORE", "Original title"])
+    main(["new", "CORE", "Original Title"])
     capsys.readouterr()
 
     assert main(["CORE-1", "set", "--title", "Renamed", "--priority", "0"]) == EXIT_OK
@@ -469,7 +469,7 @@ def testGraphRefusesAnUnwritableOutPath(inRepo: Path, capsys: pytest.CaptureFixt
     An empty path used to resolve to the working directory and reach `write_text` as a directory, surfacing as a traceback rather than as a message.
     """
 
-    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Skirmish Setup"])
     capsys.readouterr()
 
     assert main(["graph", "--out", ""]) == EXIT_USAGE
@@ -484,7 +484,7 @@ def testGraphWritesToANestedOutPath(inRepo: Path, capsys: pytest.CaptureFixture[
     A destination under directories that do not exist yet is created on the way, which the check must not have broken.
     """
 
-    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Skirmish Setup"])
     capsys.readouterr()
 
     target: Path = inRepo / "build" / "graphs" / "docket.mmd"
@@ -498,7 +498,7 @@ def testMetaSetsAKeyAndReadsTheMapBack(inRepo: Path, capsys: pytest.CaptureFixtu
     A set key is visible in the map, the round trip an agent or a human actually uses.
     """
 
-    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Skirmish Setup"])
     capsys.readouterr()
 
     assert main(["CORE-1", "meta", "video", "2026-01-devlog"]) == EXIT_OK
@@ -516,7 +516,7 @@ def testMetaWithAKeyPrintsOnlyTheValue(inRepo: Path, capsys: pytest.CaptureFixtu
     A key on its own reads that one entry raw, for the same reason `status` does, so a shell can take the answer as readily as a person.
     """
 
-    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Skirmish Setup"])
     main(["CORE-1", "meta", "video", "2026-01-devlog"])
     capsys.readouterr()
 
@@ -533,7 +533,7 @@ def testMetaReadingAnUnsetKeyFails(inRepo: Path, capsys: pytest.CaptureFixture[s
     An absent key prints nothing on stdout, since a caller reading a value must not receive an explanation where the value would have been.
     """
 
-    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Skirmish Setup"])
     capsys.readouterr()
 
     assert main(["CORE-1", "meta", "video"]) == EXIT_USAGE
@@ -549,7 +549,7 @@ def testMetaWithNoMetadataSaysSo(inRepo: Path, capsys: pytest.CaptureFixture[str
     A ticket with an empty metadata map is stated rather than printed as a bare table.
     """
 
-    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Skirmish Setup"])
     capsys.readouterr()
 
     assert main(["CORE-1", "meta"]) == EXIT_OK
@@ -561,7 +561,7 @@ def testMetaClearsAKeyWithTheFlag(inRepo: Path, capsys: pytest.CaptureFixture[st
     `-c/--clear` removes the key rather than requiring a sentinel value.
     """
 
-    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Skirmish Setup"])
     main(["CORE-1", "meta", "video", "2026-01-devlog"])
     capsys.readouterr()
 
@@ -577,7 +577,7 @@ def testMetaRejectsAValueTogetherWithClear(inRepo: Path, capsys: pytest.CaptureF
     Passing both a value and --clear is contradictory, so it is refused rather than resolved silently.
     """
 
-    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Skirmish Setup"])
     capsys.readouterr()
 
     assert main(["CORE-1", "meta", "video", "x", "--clear"]) == EXIT_USAGE
@@ -589,7 +589,7 @@ def testMetaClearWithNoKeyIsAUsageError(inRepo: Path, capsys: pytest.CaptureFixt
     Clearing has to know what to clear, and the whole map is not it.
     """
 
-    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Skirmish Setup"])
     main(["CORE-1", "meta", "video", "2026-01-devlog"])
     capsys.readouterr()
 
@@ -615,7 +615,7 @@ def testAStatusWordMovesTheFile(inRepo: Path, capsys: pytest.CaptureFixture[str]
     The frontmatter and the directory are written together, never one without the other. The status word is the whole command rather than a value handed to one.
     """
 
-    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Skirmish Setup"])
     capsys.readouterr()
 
     assert main(["CORE-1", "done"]) == EXIT_OK
@@ -629,7 +629,7 @@ def testEveryStatusIsItsOwnCommand(inRepo: Path, capsys: pytest.CaptureFixture[s
     The vocabulary is fixed, so each word in it reaches the same write.
     """
 
-    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Skirmish Setup"])
     capsys.readouterr()
 
     for status in ("wip", "done", "todo"):
@@ -645,7 +645,7 @@ def testStatusPrintsOnlyTheStatus(inRepo: Path, capsys: pytest.CaptureFixture[st
     Reading a status yields the bare word and nothing else, so a shell can read the answer as easily as a person can.
     """
 
-    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Skirmish Setup"])
     main(["CORE-1", "wip"])
     capsys.readouterr()
 
@@ -662,7 +662,7 @@ def testReadyPrintsOnlyTheAnswer(inRepo: Path, capsys: pytest.CaptureFixture[str
     Readiness reads bare for the same reason a status does, so a shell can take the answer as readily as a person.
     """
 
-    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Skirmish Setup"])
     capsys.readouterr()
 
     assert main(["CORE-1", "ready"]) == EXIT_OK
@@ -678,7 +678,7 @@ def testReadyIsFalseWhileADependencyIsOpen(inRepo: Path, capsys: pytest.CaptureF
     An open prerequisite is the case the check exists for, and closing it has to flip the answer.
     """
 
-    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Skirmish Setup"])
     main(["new", "CORE", "Deployment", "--requires", "CORE-1"])
     capsys.readouterr()
 
@@ -697,7 +697,7 @@ def testReadyExitsZeroWhenNotReady(inRepo: Path, capsys: pytest.CaptureFixture[s
     The exit code reports whether the question could be answered, not what the answer was, so a false is a successful read rather than a failure.
     """
 
-    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Skirmish Setup"])
     main(["new", "CORE", "Deployment", "--requires", "CORE-1"])
     capsys.readouterr()
 
@@ -718,7 +718,7 @@ def testListReadyKeepsOnlyUnblockedTickets(inRepo: Path, capsys: pytest.CaptureF
     The filter answers "what can I pick up right now", so a blocked ticket and a finished one both fall out of it.
     """
 
-    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Skirmish Setup"])
     main(["new", "CORE", "Deployment", "--requires", "CORE-1"])
     main(["new", "CORE", "Shipped"])
     main(["CORE-3", "done"])
@@ -728,7 +728,7 @@ def testListReadyKeepsOnlyUnblockedTickets(inRepo: Path, capsys: pytest.CaptureF
 
     out: str = capsys.readouterr().out
 
-    assert "Skirmish setup" in out
+    assert "Skirmish Setup" in out
     assert "Deployment" not in out
     assert "Shipped" not in out
 
@@ -738,16 +738,16 @@ def testListReadyComposesWithTheOtherFilters(inRepo: Path, capsys: pytest.Captur
     Readiness narrows what the other filters already selected rather than replacing them.
     """
 
-    main(["new", "CORE", "Core work"])
-    main(["new", "GEN", "Gen work"])
+    main(["new", "CORE", "Core Work"])
+    main(["new", "GEN", "Gen Work"])
     capsys.readouterr()
 
     assert main(["list", "CORE", "--ready"]) == EXIT_OK
 
     out: str = capsys.readouterr().out
 
-    assert "Core work" in out
-    assert "Gen work" not in out
+    assert "Core Work" in out
+    assert "Gen Work" not in out
 
 
 def testListReadyJudgesAgainstTheWholeSet(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -756,7 +756,7 @@ def testListReadyJudgesAgainstTheWholeSet(inRepo: Path, capsys: pytest.CaptureFi
     """
 
     main(["new", "GEN", "Groundwork"])
-    main(["new", "CORE", "Skirmish setup", "--requires", "GEN-1"])
+    main(["new", "CORE", "Skirmish Setup", "--requires", "GEN-1"])
     capsys.readouterr()
 
     assert main(["list", "CORE", "--ready"]) == EXIT_OK
@@ -793,7 +793,7 @@ def testGraphWritesBareMermaidToStdout(inRepo: Path, capsys: pytest.CaptureFixtu
     Machine-readable output bypasses `rich`, so a redirect captures exactly the source with no wrapping or escape sequences.
     """
 
-    main(["new", "CORE", "App shell"])
+    main(["new", "CORE", "App Shell"])
     capsys.readouterr()
 
     assert main(["graph"]) == EXIT_OK
@@ -823,7 +823,7 @@ def testGraphWritesToAFile(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> 
     The file receives the same bare source that stdout would have.
     """
 
-    main(["new", "CORE", "App shell"])
+    main(["new", "CORE", "App Shell"])
     capsys.readouterr()
 
     target: Path = inRepo / "out" / "graph.mmd"
@@ -848,7 +848,7 @@ def testGraphScopesFromABareToken(inRepo: Path, capsys: pytest.CaptureFixture[st
     An id and a key are told apart by shape, so one positional covers both scopes the flags spell out.
     """
 
-    main(["new", "CORE", "App shell"])
+    main(["new", "CORE", "App Shell"])
     main(["new", "GEN", "Battlescape", "--requires", "CORE-1"])
     capsys.readouterr()
 
@@ -882,7 +882,7 @@ def testGraphScopedToAKeyMarksNeighbors(inRepo: Path, capsys: pytest.CaptureFixt
     A key-scoped graph shows where the key ends.
     """
 
-    main(["new", "CORE", "App shell"])
+    main(["new", "CORE", "App Shell"])
     main(["new", "GEN", "Battlescape", "--requires", "CORE-1"])
     capsys.readouterr()
 
@@ -991,7 +991,7 @@ def testCommandsWorkFromASubdirectory(inRepo: Path, capsys: pytest.CaptureFixtur
     Configuration is found by walking up, so a command run deep inside the repository still works.
     """
 
-    main(["new", "CORE", "App shell"])
+    main(["new", "CORE", "App Shell"])
     capsys.readouterr()
 
     previous: str = os.getcwd()
@@ -1001,7 +1001,7 @@ def testCommandsWorkFromASubdirectory(inRepo: Path, capsys: pytest.CaptureFixtur
     finally:
         os.chdir(previous)
 
-    assert "App shell" in capsys.readouterr().out
+    assert "App Shell" in capsys.readouterr().out
 
 
 def testKeyDescriptionNamesTheRegistry(config: Config) -> None:
@@ -1113,7 +1113,7 @@ def testShorthandFlagsDriveNewAndSet(inRepo: Path, capsys: pytest.CaptureFixture
     Every short flag reaches the same handler its long form does.
     """
 
-    assert main(["new", "CORE", "Skirmish setup", "-p", "1", "-b", "Goal: one battle."]) == EXIT_OK
+    assert main(["new", "CORE", "Skirmish Setup", "-p", "1", "-b", "Goal: one battle."]) == EXIT_OK
     assert main(["new", "GEN", "Battlescape", "-r", "CORE-1", "-p", "0"]) == EXIT_OK
     assert main(["GEN-1", "set", "-t", "Renamed", "-p", "3", "-r", "none"]) == EXIT_OK
 
@@ -1135,7 +1135,7 @@ def testShorthandFlagsDriveListAndGraph(inRepo: Path, capsys: pytest.CaptureFixt
     The read commands take the same shorthands, including the file destination.
     """
 
-    main(["new", "CORE", "App shell", "-p", "0"])
+    main(["new", "CORE", "App Shell", "-p", "0"])
     main(["new", "GEN", "Battlescape", "-p", "4"])
     capsys.readouterr()
 
@@ -1143,7 +1143,7 @@ def testShorthandFlagsDriveListAndGraph(inRepo: Path, capsys: pytest.CaptureFixt
 
     out: str = capsys.readouterr().out
 
-    assert "App shell" in out
+    assert "App Shell" in out
     assert "Battlescape" not in out
 
     target: Path = inRepo / "out" / "graph.mmd"
@@ -1182,11 +1182,11 @@ def testListAcceptsAPriorityMaxAboveTheBand(inRepo: Path, capsys: pytest.Capture
     A ceiling above the band still describes the right set, so it is answered rather than refused.
     """
 
-    main(["new", "CORE", "App shell"])
+    main(["new", "CORE", "App Shell"])
     capsys.readouterr()
 
     assert main(["list", "-m", "99"]) == EXIT_OK
-    assert "App shell" in capsys.readouterr().out
+    assert "App Shell" in capsys.readouterr().out
 
 
 def testVersionShorthand(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:

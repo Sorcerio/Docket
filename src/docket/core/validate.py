@@ -16,6 +16,7 @@ from docket.core.config import Config
 from docket.core.graph import ResolvedGraph, findCycles, resolveGraph
 from docket.core.store import Store, TicketSet
 from docket.core.ticket import STATUSES, Ticket
+from docket.core.titles import isTitleCase, toTitleCase
 
 # MARK: Constants
 
@@ -33,6 +34,7 @@ RULE_FILENAME_MISMATCH: str = "filenameMismatch"
 RULE_STATUS_DIRECTORY: str = "statusDirectoryMismatch"
 RULE_PRIORITY_RANGE: str = "priorityOutOfRange"
 RULE_UNKNOWN_STATUS: str = "unknownStatus"
+RULE_TITLE_CASE: str = "titleCase"
 
 # MARK: Classes
 
@@ -155,6 +157,7 @@ def validate(store: Store, ticketSet: Optional[TicketSet] = None) -> ValidationR
         findings.extend(_checkStatusDirectory(ticket, store))
         findings.extend(_checkPriority(ticket, config))
         findings.extend(_checkStatus(ticket))
+        findings.extend(_checkTitleCase(ticket))
 
     findings.extend(_checkCycles(graph))
 
@@ -351,6 +354,33 @@ def _checkStatus(ticket: Ticket) -> list[Finding]:
             severity=SEVERITY_ERROR,
             rule=RULE_UNKNOWN_STATUS,
             message=f"Ticket '{ticket.id}' has status '{ticket.status}', which is not one of {', '.join(STATUSES)}.",
+            ticketId=ticket.id,
+            path=ticket.path,
+        )
+    ]
+
+
+def _checkTitleCase(ticket: Ticket) -> list[Finding]:
+    """
+    Report a title that is not in title case.
+
+    This is a warning rather than an error, because a title that reads badly still names the work and nothing downstream parses it.
+    Every write goes through the conversion, so what this catches is a file edited by hand and a ticket written before the rule existed.
+    The corrected title travels in the message, which is what lets a human operator or an agent fix it without working out the convention first.
+
+    ticket: The ticket to check.
+
+    Returns the findings.
+    """
+
+    if isTitleCase(ticket.title):
+        return []
+
+    return [
+        Finding(
+            severity=SEVERITY_WARNING,
+            rule=RULE_TITLE_CASE,
+            message=f"Ticket '{ticket.id}' has title '{ticket.title}', which is not title case. Use '{toTitleCase(ticket.title)}'.",
             ticketId=ticket.id,
             path=ticket.path,
         )

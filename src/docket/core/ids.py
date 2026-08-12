@@ -10,6 +10,8 @@ import re
 import unicodedata
 from typing import Iterable, Optional
 
+import textcase
+
 from docket.core.errors import InvalidIdError, InvalidKeyError
 
 # MARK: Constants
@@ -167,6 +169,8 @@ def slugify(title: str) -> str:
     A title is untrusted input, so this works from an allowlist of characters rather than a blocklist.
     Path separators, `..`, quotes, and control characters are discarded as a consequence of that rule rather than by explicit rejection.
 
+    The slug is cut at the cap wherever that lands, mid-word included, since the id prefix is what makes the filename unique.
+
     title: The ticket title to convert.
 
     Returns the slug, or `untitled` when nothing survives.
@@ -177,23 +181,16 @@ def slugify(title: str) -> str:
     asciiOnly: str = normalized.encode("ascii", "ignore").decode("ascii")
 
     # Split on every run of non-alphanumeric characters, which is what makes traversal impossible by construction.
+    # This is also what feeds the casing below a clean word list, since the runs it drops are the boundaries camel case would otherwise have to find for itself.
     tokens: list[str] = [token for token in SLUG_SEPARATOR_PATTERN.split(asciiOnly) if token]
     if not tokens:
         return SLUG_FALLBACK
 
-    # Lowercase the first token whole, then capitalize each later token so an acronym like `HTTP` becomes `Http` rather than shouting.
-    parts: list[str] = [tokens[0].lower()]
-    parts.extend(token[0].upper() + token[1:].lower() for token in tokens[1:])
+    # The tokens are already alphanumeric, so the split boundary is narrowed to whitespace and punctuation stripping is left off. Neither has anything left to do, and both would only risk splitting a token that survived the allowlist.
+    # An acronym like `HTTP` becomes `Http` rather than shouting, which is what camel case does to a token that is not the first.
+    slug: str = textcase.camel(" ".join(tokens), boundaries=[textcase.SPACE], strip_punctuation=False)
 
-    # Append tokens while they fit, so truncation lands on a word boundary wherever possible.
-    slug: str = ""
-    for part in parts:
-        if slug and len(slug) + len(part) > SLUG_MAX_LENGTH:
-            break
-
-        slug += part
-
-    # A single opening token longer than the cap has no boundary to break on, so cut it hard.
+    # Cut at the cap wherever it lands. The id prefix is what makes the filename unique, so a slug ending mid-word costs nothing.
     return slug[:SLUG_MAX_LENGTH]
 
 

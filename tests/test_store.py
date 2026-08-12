@@ -175,7 +175,7 @@ def testCreateAllocatesTheNextIdAndWritesTheFile(store: Store, config: Config) -
     Creation mints an id by scanning, writes to the todo directory, and derives the filename from the title.
     """
 
-    result: TicketResult = store.create(key="CORE", title="Skirmish setup", body="Goal: one battle.")
+    result: TicketResult = store.create(key="CORE", title="Skirmish Setup", body="Goal: one battle.")
 
     assert result.ticket.id == "CORE-1"
     assert result.ticket.status == "todo"
@@ -183,7 +183,31 @@ def testCreateAllocatesTheNextIdAndWritesTheFile(store: Store, config: Config) -
 
     path: Path = config.todoPath / "CORE-1_skirmishSetup.md"
     assert path.is_file()
-    assert "# Skirmish setup" in path.read_text(encoding="utf-8")
+    assert "# Skirmish Setup" in path.read_text(encoding="utf-8")
+
+
+def testCreateConvertsTheTitleEverywhereItLands(store: Store, config: Config) -> None:
+    """
+    The conversion runs once, before anything derives from the title, so the stored field, the body heading, and the slug cannot disagree.
+    """
+
+    result: TicketResult = store.create(key="CORE", title="record demo gif")
+
+    assert result.ticket.title == "Record Demo Gif"
+
+    path: Path = config.todoPath / "CORE-1_recordDemoGif.md"
+    assert path.is_file()
+    assert "# Record Demo Gif" in path.read_text(encoding="utf-8")
+
+
+def testUpdateConvertsTheTitle(store: Store) -> None:
+    """
+    Retitling goes through the same conversion, so a title cannot be lowered back in after creation.
+    """
+
+    store.create(key="CORE", title="Original Title")
+
+    assert store.update("CORE-1", title="a completely different title").ticket.title == "A Completely Different Title"
 
 
 def testCreateContinuesNumberingFromExistingTickets(store: Store, config: Config) -> None:
@@ -246,17 +270,17 @@ def testUpdateChangesFieldsWithoutRenamingTheFile(store: Store) -> None:
     Retitling must not rename the file, since that would break every prose cross-reference pointing at it.
     """
 
-    created: Ticket = store.create(key="CORE", title="Original title").ticket
+    created: Ticket = store.create(key="CORE", title="Original Title").ticket
     originalPath: Path = created.path
 
-    updated: Ticket = store.update("CORE-1", title="Completely different").ticket
+    updated: Ticket = store.update("CORE-1", title="Completely Different").ticket
 
-    assert updated.title == "Completely different"
+    assert updated.title == "Completely Different"
     assert updated.path == originalPath
     assert originalPath.name == "CORE-1_originalTitle.md"
 
     # The new title is on disk even though the filename did not follow it.
-    assert parseTicket(originalPath.read_text(encoding="utf-8")).title == "Completely different"
+    assert parseTicket(originalPath.read_text(encoding="utf-8")).title == "Completely Different"
 
 
 def testUpdateChangesPriorityAndRequires(store: Store, config: Config) -> None:
@@ -419,7 +443,7 @@ def testSetMetadataAddsAKey(store: Store) -> None:
     Setting a key that is not present yet adds it without disturbing anything else.
     """
 
-    store.create(key="CORE", title="Skirmish setup")
+    store.create(key="CORE", title="Skirmish Setup")
 
     result: TicketResult = store.setMetadata("CORE-1", "video", "2026-01-devlog")
 
@@ -431,7 +455,7 @@ def testSetMetadataOnlyTouchesTheNamedKey(store: Store) -> None:
     One consumer's key survives another consumer setting its own, since two skills may attach data to the same ticket.
     """
 
-    store.create(key="CORE", title="Skirmish setup")
+    store.create(key="CORE", title="Skirmish Setup")
     store.setMetadata("CORE-1", "video", "2026-01-devlog")
 
     result: TicketResult = store.setMetadata("CORE-1", "reviewed", True)
@@ -444,7 +468,7 @@ def testSetMetadataWithNoneValueRemovesTheKey(store: Store) -> None:
     A `None` value clears the entry rather than storing a null placeholder.
     """
 
-    store.create(key="CORE", title="Skirmish setup")
+    store.create(key="CORE", title="Skirmish Setup")
     store.setMetadata("CORE-1", "video", "2026-01-devlog")
 
     result: TicketResult = store.setMetadata("CORE-1", "video", None)
@@ -457,7 +481,7 @@ def testSetMetadataRejectsAnEmptyKey(store: Store) -> None:
     An empty key would be unreadable in the frontmatter, so it is refused at the boundary.
     """
 
-    store.create(key="CORE", title="Skirmish setup")
+    store.create(key="CORE", title="Skirmish Setup")
 
     with pytest.raises(EmptyValueError):
         store.setMetadata("CORE-1", "  ", "value")
@@ -477,7 +501,7 @@ def testSetMetadataPersistsAcrossALoad(store: Store) -> None:
     The written value survives a fresh load, not just the in-memory ticket returned from the call.
     """
 
-    store.create(key="CORE", title="Skirmish setup")
+    store.create(key="CORE", title="Skirmish Setup")
     store.setMetadata("CORE-1", "video", "2026-01-devlog")
 
     assert store.load("CORE-1").metadata == {"video": "2026-01-devlog"}
@@ -488,7 +512,7 @@ def testSetStatusToDoneMovesTheFile(store: Store, config: Config) -> None:
     The frontmatter and the directory are written together, never one without the other.
     """
 
-    created: Ticket = store.create(key="CORE", title="Skirmish setup").ticket
+    created: Ticket = store.create(key="CORE", title="Skirmish Setup").ticket
     todoPath: Path = created.path
 
     moved: Ticket = store.setStatus("CORE-1", "done")
@@ -504,7 +528,7 @@ def testSetStatusToWipStaysInTodo(store: Store, config: Config) -> None:
     Only `done` moves a file, so `wip` lives alongside `todo` exactly as the source repository did it.
     """
 
-    store.create(key="CORE", title="Skirmish setup")
+    store.create(key="CORE", title="Skirmish Setup")
 
     moved: Ticket = store.setStatus("CORE-1", "wip")
 
@@ -517,7 +541,7 @@ def testSetStatusBackToTodoMovesTheFileBack(store: Store, config: Config) -> Non
     The move is symmetric, so reopening a finished ticket returns it to the todo directory.
     """
 
-    store.create(key="CORE", title="Skirmish setup")
+    store.create(key="CORE", title="Skirmish Setup")
     store.setStatus("CORE-1", "done")
 
     reopened: Ticket = store.setStatus("CORE-1", "todo")
@@ -531,7 +555,7 @@ def testSetStatusToTheSameStatusIsANoOp(store: Store) -> None:
     Re-setting the current status succeeds rather than failing, and leaves the file in place.
     """
 
-    created: Ticket = store.create(key="CORE", title="Skirmish setup").ticket
+    created: Ticket = store.create(key="CORE", title="Skirmish Setup").ticket
 
     unchanged: Ticket = store.setStatus("CORE-1", "todo")
 
@@ -544,7 +568,7 @@ def testSetStatusRejectsAnUnknownStatus(store: Store) -> None:
     The vocabulary is fixed, so an unrecognized status is refused rather than written.
     """
 
-    store.create(key="CORE", title="Skirmish setup")
+    store.create(key="CORE", title="Skirmish Setup")
 
     with pytest.raises(InvalidStatusError):
         store.setStatus("CORE-1", "blocked")
@@ -588,6 +612,6 @@ def testFilesAreWrittenWithLfNewlines(store: Store) -> None:
     Writing LF explicitly keeps a Windows checkout from churning every touched file.
     """
 
-    created: Ticket = store.create(key="CORE", title="Skirmish setup").ticket
+    created: Ticket = store.create(key="CORE", title="Skirmish Setup").ticket
 
     assert b"\r\n" not in created.path.read_bytes()

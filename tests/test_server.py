@@ -171,7 +171,7 @@ def testCreateTicketReturnsTheNewId(inRepo: Path) -> None:
     Creation allocates the id and reports it, since the caller cannot know it in advance.
     """
 
-    payload = callTool("create_ticket", {"key": "CORE", "title": "Skirmish setup", "body": "Goal: one battle."})
+    payload = callTool("create_ticket", {"key": "CORE", "title": "Skirmish Setup", "body": "Goal: one battle."})
 
     assert payload["id"] == "CORE-1"
     assert payload["warnings"] == []
@@ -231,7 +231,7 @@ def testListTicketsNeverReturnsBodies(inRepo: Path) -> None:
     An agent listing forty tickets must not pay for forty bodies.
     """
 
-    callTool("create_ticket", {"key": "CORE", "title": "App shell", "body": "A very long body that must not appear in a listing."})
+    callTool("create_ticket", {"key": "CORE", "title": "App Shell", "body": "A very long body that must not appear in a listing."})
 
     payload = callTool("list_tickets")
 
@@ -258,14 +258,14 @@ def testReadTicketResolvesBothDirections(inRepo: Path) -> None:
     The raw file carries bare ids one way, so the tool supplies the titles, the statuses, and the whole reverse side.
     """
 
-    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
-    callTool("create_ticket", {"key": "CORE", "title": "Skirmish setup", "requires": ["CORE-1"]})
+    callTool("create_ticket", {"key": "CORE", "title": "App Shell"})
+    callTool("create_ticket", {"key": "CORE", "title": "Skirmish Setup", "requires": ["CORE-1"]})
 
     payload = callTool("read_ticket", {"id": "CORE-1"})
 
     assert payload["requires"] == []
-    assert payload["requiredBy"] == [{"id": "CORE-2", "title": "Skirmish setup", "status": "todo", "priority": 2, "exists": True}]
-    assert "# App shell" in payload["body"]
+    assert payload["requiredBy"] == [{"id": "CORE-2", "title": "Skirmish Setup", "status": "todo", "priority": 2, "exists": True}]
+    assert "# App Shell" in payload["body"]
 
 
 def testReadTicketFlagsAMissingDependency(inRepo: Path) -> None:
@@ -286,8 +286,8 @@ def testReadTicketCarriesReadiness(inRepo: Path) -> None:
     An agent already reading a ticket must not have to make a second call to find out whether it can act on it.
     """
 
-    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
-    callTool("create_ticket", {"key": "CORE", "title": "Skirmish setup", "requires": ["CORE-1"]})
+    callTool("create_ticket", {"key": "CORE", "title": "App Shell"})
+    callTool("create_ticket", {"key": "CORE", "title": "Skirmish Setup", "requires": ["CORE-1"]})
 
     assert callTool("read_ticket", {"id": "CORE-1"})["ready"] is True
     assert callTool("read_ticket", {"id": "CORE-2"})["ready"] is False
@@ -298,15 +298,15 @@ def testCheckReadyNamesWhatIsBlocking(inRepo: Path) -> None:
     Refusing without naming the blocker would leave the agent to work out the reason, which is the inference this tool exists to replace.
     """
 
-    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
-    callTool("create_ticket", {"key": "CORE", "title": "Skirmish setup", "requires": ["CORE-1"]})
+    callTool("create_ticket", {"key": "CORE", "title": "App Shell"})
+    callTool("create_ticket", {"key": "CORE", "title": "Skirmish Setup", "requires": ["CORE-1"]})
 
     payload = callTool("check_ready", {"id": "CORE-2"})
 
     assert payload == {
         "id": "CORE-2",
         "ready": False,
-        "blocked_by": [{"id": "CORE-1", "title": "App shell", "status": "todo", "priority": 2, "exists": True}],
+        "blocked_by": [{"id": "CORE-1", "title": "App Shell", "status": "todo", "priority": 2, "exists": True}],
     }
 
 
@@ -315,8 +315,8 @@ def testCheckReadyClearsOnceTheDependencyIsDone(inRepo: Path) -> None:
     Readiness is derived on every read rather than stored, so closing a dependency flips the answer with nothing else written.
     """
 
-    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
-    callTool("create_ticket", {"key": "CORE", "title": "Skirmish setup", "requires": ["CORE-1"]})
+    callTool("create_ticket", {"key": "CORE", "title": "App Shell"})
+    callTool("create_ticket", {"key": "CORE", "title": "Skirmish Setup", "requires": ["CORE-1"]})
     callTool("set_status", {"id": "CORE-1", "status": "done"})
 
     payload = callTool("check_ready", {"id": "CORE-2"})
@@ -372,7 +372,7 @@ def testReadTicketCarriesMetadata(inRepo: Path) -> None:
     Metadata is a recognized field, so it is returned in its own payload key rather than folded into `extra`.
     """
 
-    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
+    callTool("create_ticket", {"key": "CORE", "title": "App Shell"})
     callTool("set_metadata", {"id": "CORE-1", "key": "video", "value": "2026-01-devlog"})
 
     payload = callTool("read_ticket", {"id": "CORE-1"})
@@ -386,7 +386,7 @@ def testSetMetadataOnlyTouchesTheNamedKey(inRepo: Path) -> None:
     Two consumers writing different keys to the same ticket do not clobber each other.
     """
 
-    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
+    callTool("create_ticket", {"key": "CORE", "title": "App Shell"})
     callTool("set_metadata", {"id": "CORE-1", "key": "video", "value": "2026-01-devlog"})
 
     payload = callTool("set_metadata", {"id": "CORE-1", "key": "reviewed", "value": True})
@@ -399,7 +399,7 @@ def testSetMetadataWithNullValueRemovesTheKey(inRepo: Path) -> None:
     A null value clears the entry rather than storing it as a null.
     """
 
-    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
+    callTool("create_ticket", {"key": "CORE", "title": "App Shell"})
     callTool("set_metadata", {"id": "CORE-1", "key": "video", "value": "2026-01-devlog"})
 
     payload = callTool("set_metadata", {"id": "CORE-1", "key": "video", "value": None})
@@ -434,7 +434,7 @@ def testUpdateTicketChangesFieldsWithoutRenaming(inRepo: Path) -> None:
     Retitling through the tool leaves the filename alone, so prose cross-references elsewhere survive.
     """
 
-    callTool("create_ticket", {"key": "CORE", "title": "Original title"})
+    callTool("create_ticket", {"key": "CORE", "title": "Original Title"})
 
     payload = callTool("update_ticket", {"id": "CORE-1", "title": "Renamed", "priority": 0})
 
@@ -484,7 +484,7 @@ def testSetStatusMovesTheFile(inRepo: Path) -> None:
     The frontmatter and the directory are written together, which is why an agent never needs to move a file itself.
     """
 
-    callTool("create_ticket", {"key": "CORE", "title": "Skirmish setup"})
+    callTool("create_ticket", {"key": "CORE", "title": "Skirmish Setup"})
 
     payload = callTool("set_status", {"id": "CORE-1", "status": "done"})
 
@@ -498,7 +498,7 @@ def testSetStatusRejectsAnUnknownStatus(inRepo: Path) -> None:
     The vocabulary is fixed, so an unrecognized status is refused rather than written.
     """
 
-    callTool("create_ticket", {"key": "CORE", "title": "Skirmish setup"})
+    callTool("create_ticket", {"key": "CORE", "title": "Skirmish Setup"})
 
     with pytest.raises(Exception) as excInfo:
         callTool("set_status", {"id": "CORE-1", "status": "blocked"})
@@ -511,7 +511,7 @@ def testGraphReturnsMermaidAsAField(inRepo: Path) -> None:
     The source is a field in a JSON payload rather than the whole body, so scope and size travel with it.
     """
 
-    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
+    callTool("create_ticket", {"key": "CORE", "title": "App Shell"})
 
     payload = callTool("graph")
 
@@ -526,7 +526,7 @@ def testGraphScopesToATicket(inRepo: Path) -> None:
     Scoping to an id narrows the graph and records what it was scoped to.
     """
 
-    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
+    callTool("create_ticket", {"key": "CORE", "title": "App Shell"})
     callTool("create_ticket", {"key": "GEN", "title": "Unrelated"})
 
     payload = callTool("graph", {"id": "CORE-1"})
@@ -540,7 +540,7 @@ def testGraphScopesToAKeyAndMarksNeighbors(inRepo: Path) -> None:
     A key-scoped graph shows where the key ends.
     """
 
-    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
+    callTool("create_ticket", {"key": "CORE", "title": "App Shell"})
     callTool("create_ticket", {"key": "GEN", "title": "Battlescape", "requires": ["CORE-1"]})
 
     payload = callTool("graph", {"key": "GEN"})
@@ -654,7 +654,7 @@ def testPayloadsAreCompactJson(inRepo: Path) -> None:
     An agent pays for every token, so payloads carry no indentation padding.
     """
 
-    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
+    callTool("create_ticket", {"key": "CORE", "title": "App Shell"})
 
     result: CallToolResult = asyncio.run(server.mcp.call_tool("list_tickets", {}))
     text: str = result.content[0].text
@@ -668,7 +668,7 @@ def testTheServerNeverWritesToStdout(inRepo: Path, capsys: pytest.CaptureFixture
     The MCP stdio transport owns stdout, so a single stray byte from a handler would corrupt the protocol.
     """
 
-    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
+    callTool("create_ticket", {"key": "CORE", "title": "App Shell"})
     callTool("list_tickets")
     callTool("validate")
 

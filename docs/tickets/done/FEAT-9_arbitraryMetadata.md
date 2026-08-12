@@ -1,6 +1,6 @@
 ---
 id: FEAT-9
-title: Track arbitrary additional metadata on tickets/groups
+title: Track Arbitrary Additional Metadata on Tickets/Groups
 status: done
 priority: 1
 requires: []

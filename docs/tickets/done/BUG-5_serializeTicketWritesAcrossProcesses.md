@@ -1,6 +1,6 @@
 ---
 id: BUG-5
-title: Serialize ticket writes across processes
+title: Serialize Ticket Writes Across Processes
 status: done
 priority: 3
 requires: []
