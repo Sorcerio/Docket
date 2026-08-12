@@ -1,9 +1,10 @@
 ---
 id: FEAT-1
-title: Record demo GIF with VHS
+title: Record Demo GIF with VHS
 status: done
 priority: 2
 requires: []
+metadata: {}
 ---
 
 # Record demo GIF with VHS

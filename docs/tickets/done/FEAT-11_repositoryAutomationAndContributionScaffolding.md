@@ -1,6 +1,6 @@
 ---
 id: FEAT-11
-title: Repository automation and contribution scaffolding
+title: Repository Automation and Contribution Scaffolding
 status: done
 priority: 3
 requires: [FEAT-2]

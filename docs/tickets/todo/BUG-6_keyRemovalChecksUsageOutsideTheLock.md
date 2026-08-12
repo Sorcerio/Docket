@@ -1,6 +1,6 @@
 ---
 id: BUG-6
-title: Key removal checks usage outside the lock
+title: Key Removal Checks Usage Outside the Lock
 status: todo
 priority: 4
 requires: [BUG-5]
