@@ -231,6 +231,23 @@ def subgraphForKey(graph: ResolvedGraph, key: str) -> ResolvedGraph:
     return scoped
 
 
+def subgraphForStatus(graph: ResolvedGraph, status: str) -> ResolvedGraph:
+    """
+    Scope a graph to the tickets carrying one status, and nothing else.
+
+    Nothing is borrowed from outside, unlike the key scope. A key has a boundary worth drawing, since the work either side of it is still related, but the tickets around a status are only the same work at a different moment, so pulling them in would put every other status back on the page. An edge therefore survives only when both of its ends carry the status, which is what lets the result read as the ordering within that status alone.
+
+    graph: The graph to scope.
+    status: The status to scope to.
+
+    Returns the scoped graph.
+    """
+
+    members: set[str] = {node.id for node in graph.nodes.values() if node.status == status}
+
+    return _restrict(graph, members, scope=status)
+
+
 def dependencyContext(ticketSet: TicketSet, ticketId: str) -> dict[str, list[dict[str, object]]]:
     """
     Resolve the context a raw ticket file deliberately does not carry.

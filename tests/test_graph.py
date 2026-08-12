@@ -8,7 +8,7 @@ Cover reverse edge derivation, scoped traversal, dependency context, readiness, 
 
 import pytest
 
-from docket.core.graph import Edge, Readiness, ResolvedGraph, dependencyContext, findCycles, readyTickets, resolveGraph, subgraphForId, subgraphForKey, ticketReadiness
+from docket.core.graph import Edge, Readiness, ResolvedGraph, dependencyContext, findCycles, readyTickets, resolveGraph, subgraphForId, subgraphForKey, subgraphForStatus, ticketReadiness
 from docket.core.store import TicketSet
 from docket.core.ticket import Ticket
 
@@ -148,6 +148,41 @@ def testSubgraphForKeyMarksCrossKeyNeighbors() -> None:
 
     # Only immediate neighbors are pulled in, so the walk does not spread across the whole set.
     assert "HEAD-1" not in scoped
+
+
+def testSubgraphForStatusKeepsOnlyThatStatus() -> None:
+    """
+    A status has no boundary worth drawing, so nothing outside it is borrowed and an edge survives only when both of its ends carry it.
+    """
+
+    ticketSet: TicketSet = buildSet(
+        ("CORE-1", []),
+        ("CORE-2", ["CORE-1"]),
+        ("CORE-3", ["CORE-2"]),
+    )
+    ticketSet.tickets["CORE-1"].status = "done"
+
+    scoped: ResolvedGraph = subgraphForStatus(resolveGraph(ticketSet), "todo")
+
+    assert sorted(scoped.nodes) == ["CORE-2", "CORE-3"]
+    assert scoped.scope == "todo"
+
+    # The dependency inside the status keeps its arrow, while the one leaving it goes with the node it pointed at.
+    assert scoped.edges == [Edge(fromId="CORE-2", toId="CORE-3")]
+
+    # Nothing was borrowed, so the flag a key scope sets is never set here.
+    assert not any(node.isExternal for node in scoped.nodes.values())
+
+
+def testSubgraphForStatusMatchingNothingIsEmpty() -> None:
+    """
+    A status nothing carries is a true answer rather than a mistake, so it scopes to an empty graph instead of raising.
+    """
+
+    scoped: ResolvedGraph = subgraphForStatus(resolveGraph(buildSet(("CORE-1", []))), "done")
+
+    assert len(scoped) == 0
+    assert scoped.edges == []
 
 
 def testSubgraphOnlyKeepsEdgesWithBothEndsPresent() -> None:

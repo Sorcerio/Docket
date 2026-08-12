@@ -842,6 +842,11 @@ def testGraphScopeFlagsAreMutuallyExclusive(inRepo: Path) -> None:
 
     assert excInfo.value.code == EXIT_USAGE
 
+    with pytest.raises(SystemExit) as excInfo:
+        main(["graph", "--status", "todo", "--key", "CORE"])
+
+    assert excInfo.value.code == EXIT_USAGE
+
 
 def testGraphScopesFromABareToken(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """
@@ -859,9 +864,61 @@ def testGraphScopesFromABareToken(inRepo: Path, capsys: pytest.CaptureFixture[st
     assert "CORE_1" in capsys.readouterr().out
 
 
+def testGraphScopesToAStatus(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    A status word is the third shape the one positional reads, and it keeps only the tickets carrying that status.
+    """
+
+    main(["new", "CORE", "App Shell"])
+    main(["new", "GEN", "Battlescape", "--requires", "CORE-1"])
+    main(["CORE-1", "done"])
+    capsys.readouterr()
+
+    assert main(["graph", "todo"]) == EXIT_OK
+
+    output: str = capsys.readouterr().out
+    assert "GEN_1" in output
+    assert "CORE_1" not in output
+
+
+def testGraphScopedToAStatusDropsAnEdgeLeavingIt(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Nothing outside the status is borrowed, so an edge survives only when both of its ends carry it.
+    """
+
+    main(["new", "CORE", "App Shell"])
+    main(["new", "GEN", "Battlescape", "--requires", "CORE-1"])
+    main(["new", "GEN", "Skirmish Setup", "--requires", "GEN-1"])
+    main(["CORE-1", "done"])
+    capsys.readouterr()
+
+    assert main(["graph", "--status", "todo"]) == EXIT_OK
+
+    output: str = capsys.readouterr().out
+
+    # The dependency inside the status keeps its arrow, while the one leaving it goes with the node it pointed at.
+    assert "GEN_1 --> GEN_2" in output
+    assert "CORE_1 -->" not in output
+
+    # Nothing is borrowed, so a status scope never produces the dashed boundary a key scope does.
+    assert "external" not in output
+
+
+def testGraphScopedToAnEmptyStatusIsAnAnswer(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    A status nothing carries is a true answer rather than a mistake, unlike a key nobody registered.
+    """
+
+    main(["new", "CORE", "App Shell"])
+    capsys.readouterr()
+
+    assert main(["graph", "done"]) == EXIT_OK
+    assert capsys.readouterr().out.startswith("graph TD\n")
+
+
 def testGraphRefusesAScopeItCannotRead(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """
-    A token that is neither an id nor a key would otherwise scope to nothing, which reads as an answer rather than a mistake.
+    A token that is none of the three shapes would otherwise scope to nothing, which reads as an answer rather than a mistake.
     """
 
     assert main(["graph", "nonsense"]) == EXIT_USAGE
@@ -875,6 +932,20 @@ def testGraphRefusesATokenBesideAFlag(inRepo: Path, capsys: pytest.CaptureFixtur
 
     assert main(["graph", "CORE", "--key", "GEN"]) == EXIT_USAGE
     assert "already scopes the graph" in capsys.readouterr().err
+
+    assert main(["graph", "CORE", "--status", "todo"]) == EXIT_USAGE
+    assert "already scopes the graph" in capsys.readouterr().err
+
+
+def testGraphRefusesAStatusOutsideTheVocabulary(inRepo: Path) -> None:
+    """
+    The status vocabulary is fixed, so a word outside it is a typo rather than an empty graph.
+    """
+
+    with pytest.raises(SystemExit) as excInfo:
+        main(["graph", "--status", "started"])
+
+    assert excInfo.value.code == EXIT_USAGE
 
 
 def testGraphScopedToAKeyMarksNeighbors(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -1289,13 +1360,15 @@ def testFilterResolutionRefusesAnUnreadableToken() -> None:
 
 def testScopeResolutionReadsTheTokenShape() -> None:
     """
-    One positional covers both scopes, because an id and a key cannot be confused for one another.
+    One positional covers all three scopes, because an id, a key, and a status cannot be confused for one another.
     """
 
-    assert resolveGraphScope("CORE-14", None, None) == ("CORE-14", None)
-    assert resolveGraphScope("CORE", None, None) == (None, "CORE")
-    assert resolveGraphScope(None, "CORE-14", None) == ("CORE-14", None)
-    assert resolveGraphScope(None, None, None) == (None, None)
+    assert resolveGraphScope("CORE-14", None, None, None) == ("CORE-14", None, None)
+    assert resolveGraphScope("CORE", None, None, None) == (None, "CORE", None)
+    assert resolveGraphScope("todo", None, None, None) == (None, None, "todo")
+    assert resolveGraphScope(None, "CORE-14", None, None) == ("CORE-14", None, None)
+    assert resolveGraphScope(None, None, None, "done") == (None, None, "done")
+    assert resolveGraphScope(None, None, None, None) == (None, None, None)
 
 
 def testScopeResolutionRefusesATokenBesideAFlag() -> None:
@@ -1304,16 +1377,19 @@ def testScopeResolutionRefusesATokenBesideAFlag() -> None:
     """
 
     with pytest.raises(ConflictingArgumentsError):
-        resolveGraphScope("CORE", None, "GEN")
+        resolveGraphScope("CORE", None, "GEN", None)
+
+    with pytest.raises(ConflictingArgumentsError):
+        resolveGraphScope("CORE", None, None, "todo")
 
 
 def testScopeResolutionRefusesAnUnreadableToken() -> None:
     """
-    A scope that is neither an id nor a key would render an empty graph, which reads as an answer rather than a mistake.
+    A scope that is none of the three shapes would render an empty graph, which reads as an answer rather than a mistake.
     """
 
     with pytest.raises(InvalidArgumentError):
-        resolveGraphScope("nonsense", None, None)
+        resolveGraphScope("nonsense", None, None, None)
 
 
 @pytest.mark.parametrize(

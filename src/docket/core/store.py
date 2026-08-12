@@ -12,10 +12,10 @@ from typing import Any, Iterator, Optional
 
 from docket.core.atomic import writeTextAtomic
 from docket.core.config import Config
-from docket.core.errors import ConflictingArgumentsError, InvalidPriorityError, InvalidStatusError, TicketNotFoundError, TicketParseError
+from docket.core.errors import ConflictingArgumentsError, InvalidPriorityError, TicketNotFoundError, TicketParseError
 from docket.core.ids import buildFilename, nextId, parseId, requireValidKey
 from docket.core.inputs import requireText
-from docket.core.ticket import STATUS_DONE, STATUSES, Ticket, buildBody, parseTicket, serializeTicket
+from docket.core.ticket import STATUS_DONE, STATUSES, Ticket, buildBody, parseTicket, requireKnownStatus, serializeTicket
 from docket.core.titles import toTitleCase
 
 # MARK: Constants
@@ -430,8 +430,7 @@ class Store:
         """
 
         # Reject an unrecognized status at the boundary rather than writing it and leaving `validate` to find it later.
-        if status not in STATUSES:
-            raise InvalidStatusError(f"Status '{status}' is not one of {', '.join(STATUSES)}.")
+        requireKnownStatus(status)
 
         with self.config.exclusiveLock():
             ticket: Ticket = self.__loadAllUnlocked().get(ticketId)

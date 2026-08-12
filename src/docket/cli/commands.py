@@ -18,7 +18,7 @@ from docket.cli.grammar import EXIT_INVALID, EXIT_OK, EXIT_USAGE, OUT_ARGUMENT, 
 from docket.cli.output import STATUS_STYLES, Output, buildContextTable, relativeToRoot
 from docket.core.config import Config
 from docket.core.deploy import DeployReport, deploy, upgrade
-from docket.core.graph import Readiness, ResolvedGraph, dependencyContext, readyTickets, resolveGraph, subgraphForId, subgraphForKey, ticketReadiness
+from docket.core.graph import Readiness, ResolvedGraph, dependencyContext, readyTickets, resolveGraph, subgraphForId, subgraphForKey, subgraphForStatus, ticketReadiness
 from docket.core.inputs import requireWritableFile, writeFile
 from docket.core.mermaid import renderGraph
 from docket.core.store import Store, TicketResult, TicketSet
@@ -325,17 +325,20 @@ def commandGraph(args: argparse.Namespace, store: Store, output: Output) -> int:
     Returns the process exit code.
     """
 
-    ticketId, key = resolveGraphScope(args.scope, args.id, args.key)
+    ticketId, key, status = resolveGraphScope(args.scope, args.id, args.key, args.status)
 
     graph: ResolvedGraph = resolveGraph(store.loadAll())
 
-    # Scope the graph when asked. At most one of the two survives resolution.
+    # Scope the graph when asked. At most one of the three survives resolution.
     if ticketId is not None:
         graph = subgraphForId(graph, ticketId)
     elif key is not None:
         # For the same reason as `list`, an unregistered key here would render an empty graph rather than admitting the key does not exist.
         store.config.requireKnownKey(key)
         graph = subgraphForKey(graph, key)
+    elif status is not None:
+        # No equivalent check, because the vocabulary is fixed and both spellings are checked against it before they arrive. An empty result here is a true answer rather than a typo.
+        graph = subgraphForStatus(graph, status)
 
     source: str = renderGraph(graph)
 

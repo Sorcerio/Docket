@@ -549,6 +549,36 @@ def testGraphScopesToAKeyAndMarksNeighbors(inRepo: Path) -> None:
     assert "external" in payload["mermaid"]
 
 
+def testGraphScopesToAStatus(inRepo: Path) -> None:
+    """
+    Nothing outside the status is borrowed, so the result is the tickets carrying it and the edges between them.
+    """
+
+    callTool("create_ticket", {"key": "CORE", "title": "App Shell"})
+    callTool("create_ticket", {"key": "GEN", "title": "Battlescape", "requires": ["CORE-1"]})
+    callTool("set_status", {"id": "CORE-1", "status": "done"})
+
+    payload = callTool("graph", {"status": "todo"})
+
+    assert payload["scope"] == "todo"
+    assert payload["nodeCount"] == 1
+
+    # The edge left the scope with the node it pointed at, and nothing was borrowed to replace it.
+    assert "-->" not in payload["mermaid"]
+    assert "external" not in payload["mermaid"]
+
+
+def testGraphRejectsAnUnknownStatus(inRepo: Path) -> None:
+    """
+    The vocabulary is fixed, so an unrecognized status is refused rather than answered with an empty graph.
+    """
+
+    with pytest.raises(Exception) as excInfo:
+        callTool("graph", {"status": "blocked"})
+
+    assert "blocked" in str(excInfo.value)
+
+
 def testListKeysReturnsEveryRegisteredKey(inRepo: Path) -> None:
     """
     An agent needs the full set of keys it may create under, with the descriptions that say which one fits.

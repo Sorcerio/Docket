@@ -8,4 +8,4 @@ A per-repo ticketing system that is plain markdown for humans and structured MCP
 
 # No type check to comply with hatch's requirements.
 # Do not re-add.
-__version__ = "1.2.0"
+__version__ = "1.3.0"

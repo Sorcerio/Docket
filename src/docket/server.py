@@ -32,10 +32,10 @@ from mcp.server import MCPServer
 
 from docket import __version__
 from docket.core.config import Config, discoverConfig
-from docket.core.graph import Readiness, ResolvedGraph, dependencyContext, resolveGraph, subgraphForId, subgraphForKey, ticketReadiness
+from docket.core.graph import Readiness, ResolvedGraph, dependencyContext, resolveGraph, subgraphForId, subgraphForKey, subgraphForStatus, ticketReadiness
 from docket.core.mermaid import renderGraph
 from docket.core.store import Store, TicketResult, TicketSet
-from docket.core.ticket import Ticket
+from docket.core.ticket import Ticket, requireKnownStatus
 from docket.core.validate import ValidationReport, validate
 
 # MARK: Constants
@@ -223,7 +223,7 @@ async def setStatus(id: str, status: str) -> str:
 
 
 @mcp.tool(name="graph")
-async def graphTool(id: Optional[str] = None, key: Optional[str] = None) -> str:
+async def graphTool(id: Optional[str] = None, key: Optional[str] = None, status: Optional[str] = None) -> str:
     """
     Render the dependency graph as mermaid source.
 
@@ -231,16 +231,20 @@ async def graphTool(id: Optional[str] = None, key: Optional[str] = None) -> str:
 
     id: Scope to one ticket's transitive ancestors and descendants.
     key: Scope to one key, plus its immediate cross-key neighbors, which are marked so the boundary is visible.
+    status: Scope to the tickets with this status alone, one of todo, wip, done. Nothing outside it is borrowed, so an edge survives only when both of its ends carry the status.
     """
 
     store: Store = _store()
     graph: ResolvedGraph = resolveGraph(store.loadAll())
 
-    # Scope when asked, preferring an id since it is the narrower request.
+    # Scope when asked, narrowest request first.
     if id is not None:
         graph = subgraphForId(graph, id)
     elif key is not None:
         graph = subgraphForKey(graph, key)
+    elif status is not None:
+        # The CLI has `choices` to reject a status nobody uses, and without the same check here an unreadable one would render an empty graph that reads as an answer.
+        graph = subgraphForStatus(graph, requireKnownStatus(status))
 
     return _json({"scope": graph.scope, "nodeCount": len(graph), "mermaid": renderGraph(graph)})
 

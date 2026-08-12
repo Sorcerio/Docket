@@ -12,7 +12,7 @@ from typing import Any, Optional
 
 import yaml
 
-from docket.core.errors import TicketParseError
+from docket.core.errors import InvalidStatusError, TicketParseError
 from docket.core.fields import readDict, readInt, readString, readStringList
 from docket.core.ids import keyOf
 
@@ -156,6 +156,23 @@ def _representFlowList(dumper: yaml.SafeDumper, data: FlowList) -> yaml.Node:
 
 
 TicketDumper.add_representer(FlowList, _representFlowList)
+
+
+def requireKnownStatus(status: str) -> str:
+    """
+    Return the status unchanged, raising when it is not one of the fixed vocabulary.
+
+    The vocabulary is closed, so every surface that accepts a status has the same check to make. It lives here beside the vocabulary itself rather than at each surface, the same way `requireKnownKey` sits beside the registry.
+
+    status: The status to check.
+
+    Returns the same status.
+    """
+
+    if status not in STATUSES:
+        raise InvalidStatusError(f"Status '{status}' is not one of {', '.join(STATUSES)}.")
+
+    return status
 
 
 def splitFrontmatter(text: str) -> tuple[str, str]:
