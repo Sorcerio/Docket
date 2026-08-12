@@ -3,7 +3,7 @@ id: FEAT-12
 title: Per Key Ticket Board View
 status: todo
 priority: 2
-requires: []
+requires: [FEAT-6]
 metadata: {}
 ---
 
