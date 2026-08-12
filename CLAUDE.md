@@ -44,3 +44,11 @@ camelCase is the repo-wide Python convention above. Two external interfaces do N
 TOML config keys stay camelCase, matching the repo style.
 
 Keep the snake_case-to-camelCase mapping explicit in `server.py`. Neither convention leaks into the other.
+
+## Commits
+
+- Plain messages only. Do NOT add a `Co-Authored-By` or `Generated with` trailer unless explicitly asked.
+- Short subject line expressing what was done as a short imperative.
+- Subject line only. No body, no additional text.
+- Never commit unprompted. Verify (compile and test), report ready for review, then wait for review.
+- When presenting code for review, use the `commit-message` skill to draft the commit subject alongside it.
