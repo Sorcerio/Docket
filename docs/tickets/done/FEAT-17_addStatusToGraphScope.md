@@ -1,7 +1,7 @@
 ---
 id: FEAT-17
 title: Add Status to Graph Scope
-status: todo
+status: done
 priority: 1
 requires: []
 metadata: {}

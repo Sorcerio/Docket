@@ -184,34 +184,40 @@ def resolveListFilters(tokens: list[str], status: Optional[str], key: Optional[s
     return resolved[TOKEN_STATUS], resolved[TOKEN_KEY], None if ceiling is None else int(ceiling)
 
 
-def resolveGraphScope(scope: Optional[str], ticketId: Optional[str], key: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+def resolveGraphScope(scope: Optional[str], ticketId: Optional[str], key: Optional[str], status: Optional[str]) -> tuple[Optional[str], Optional[str], Optional[str]]:
     """
     Resolve the graph's scope from its bare token and its flags together.
 
-    An id and a key are told apart by shape, which is what makes `docket graph CORE-14` and `docket graph GEN` both unambiguous. The flags stay for the explicit form, and combining the two spellings is refused, since `argparse` can enforce that `--id` and `--key` exclude each other but cannot reach across to a positional.
+    An id, a key, and a status are told apart by shape, which is what makes `docket graph CORE-14`, `docket graph GEN`, and `docket graph todo` all unambiguous. The flags stay for the explicit form, and combining the two spellings is refused, since `argparse` can enforce that the flags exclude each other but cannot reach across to a positional.
+
+    The three scopes remain exclusive rather than composing. A graph is scoped to one thing, and narrowing an already narrowed graph is what `list`'s filters are for.
 
     scope: The bare scope token, or `None`.
     ticketId: The id named by `--id`, or `None`.
     key: The key named by `--key`, or `None`.
+    status: The status named by `--status`, or `None`.
 
-    Returns the resolved `(id, key)` pair, at most one of which is set.
+    Returns the resolved `(id, key, status)` triple, at most one of which is set.
     """
 
     if scope is None:
-        return ticketId, key
+        return ticketId, key, status
 
-    if ticketId is not None or key is not None:
-        raise ConflictingArgumentsError(f"'{scope}' already scopes the graph, so it cannot be combined with -i/--id or -k/--key.")
+    if ticketId is not None or key is not None or status is not None:
+        raise ConflictingArgumentsError(f"'{scope}' already scopes the graph, so it cannot be combined with -i/--id, -k/--key, or -s/--status.")
 
     kind: Optional[str] = classifyToken(scope)
 
     if kind == TOKEN_ID:
-        return scope, None
+        return scope, None, None
 
     if kind == TOKEN_KEY:
-        return None, scope
+        return None, scope, None
 
-    raise InvalidArgumentError(f"Cannot read '{scope}' as a scope. Expected a ticket id, for example 'CORE-14', or a key.")
+    if kind == TOKEN_STATUS:
+        return None, None, scope
+
+    raise InvalidArgumentError(f"Cannot read '{scope}' as a scope. Expected a ticket id, for example 'CORE-14', a key, or a status ({', '.join(STATUSES)}).")
 
 
 def buildParser(config: Optional[Config] = None) -> argparse.ArgumentParser:
@@ -254,10 +260,11 @@ def buildParser(config: Optional[Config] = None) -> argparse.ArgumentParser:
     listParser.add_argument("-r", "--ready", action="store_true", help="Keep only tickets whose dependencies are all done. A done ticket is never ready, so this never shows one.")
 
     graphParser: argparse.ArgumentParser = commands.add_parser("graph", help="Render the dependency graph as mermaid source.", formatter_class=RichHelpFormatter)
-    graphParser.add_argument("scope", nargs="?", metavar="SCOPE", help="What to scope to, read from its own shape: a ticket id, or a key. The flags below are the same two, named explicitly.")
+    graphParser.add_argument("scope", nargs="?", metavar="SCOPE", help=f"What to scope to, read from its own shape: a ticket id, a key, or a status ({', '.join(STATUSES)}). The flags below are the same three, named explicitly.")
     graphScope = graphParser.add_mutually_exclusive_group()
     graphScope.add_argument("-i", "--id", help="Scope to one ticket's ancestors and descendants.")
     graphScope.add_argument("-k", "--key", help=f"Scope to one key, plus its immediate cross-key neighbors. {keyOptions}")
+    graphScope.add_argument("-s", "--status", choices=STATUSES, help="Scope to the tickets with this status alone. Nothing outside it is borrowed, so an edge survives only when both of its ends carry the status.")
     graphParser.add_argument("-o", "--out", help="Write to a file rather than to stdout.")
 
     keyParser: argparse.ArgumentParser = commands.add_parser("key", help="Inspect and manage the key registry.", formatter_class=RichHelpFormatter)

@@ -98,7 +98,7 @@ Everything else works on the set:
 ```bash
 docket new CORE "Skirmish setup" [-r CORE-9,GEN-3] [-p 1] [-b TEXT]
 docket list [-s todo] [-k CORE] [-m 2] [-r]
-docket graph [-i CORE-14 | -k GEN] [-o FILE]
+docket graph [-i CORE-14 | -k GEN | -s todo] [-o FILE]
 docket key list | add KEY "desc" [-r TEXT] | remove KEY
 docket validate | deploy PATH | upgrade PATH
 ```
@@ -121,7 +121,7 @@ Every short flag has a long form (`-k/--key`, `-p/--priority`, `-m/--priority-ma
 | `create_ticket(key, title, body?, requires?, priority?)` | Allocates the id, writes the file. |
 | `update_ticket(id, title?, priority?, requires?, requires_add?, requires_remove?)` | Those three fields only. |
 | `set_status(id, status)` | Writes frontmatter and moves the file together. |
-| `graph(id?, key?)` | Mermaid source. |
+| `graph(id?, key?, status?)` | Mermaid source. |
 | `list_keys()` | The registered keys. |
 | `add_key(key, description, rationale)` | After the agent has asked the user. |
 | `validate()` | Structured findings. |
