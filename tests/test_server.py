@@ -89,7 +89,7 @@ def testEveryHandlerIsAsync() -> None:
     """
     `MCPServer` runs a synchronous handler on a worker thread, which would let two calls into the core at once, and every write there reads the ticket set and then writes it back with nothing guarding the gap.
 
-    Two creates would allocate one id twice, two edits would lose one of them, and a read landing mid-write would see a half-written file. Staying on the event loop is what prevents all three, so it is asserted rather than left to whoever adds the eleventh tool.
+    Two creates would allocate one id twice, two edits would lose one of them, and a read landing mid-write would see a half-written file. Staying on the event loop is what prevents all three, so it is asserted rather than left to whoever adds the twelfth tool.
     """
 
     handlers: list[Callable[..., Any]] = toolHandlers()
@@ -103,11 +103,11 @@ def testEveryHandlerIsAsync() -> None:
 
 def testEveryDocumentedToolIsRegistered() -> None:
     """
-    The surface is exactly the ten tools the design specifies, no more and no fewer.
+    The surface is exactly the eleven tools the design specifies, no more and no fewer.
     """
 
     assert sorted(toolNames()) == sorted(
-        ["list_tickets", "read_ticket", "create_ticket", "update_ticket", "set_metadata", "set_status", "graph", "list_keys", "add_key", "validate"]
+        ["list_tickets", "read_ticket", "check_ready", "create_ticket", "update_ticket", "set_metadata", "set_status", "graph", "list_keys", "add_key", "validate"]
     )
 
 
@@ -279,6 +279,77 @@ def testReadTicketFlagsAMissingDependency(inRepo: Path) -> None:
 
     assert payload["requires"][0]["exists"] is False
     assert payload["requires"][0]["id"] == "CORE-99"
+
+
+def testReadTicketCarriesReadiness(inRepo: Path) -> None:
+    """
+    An agent already reading a ticket must not have to make a second call to find out whether it can act on it.
+    """
+
+    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
+    callTool("create_ticket", {"key": "CORE", "title": "Skirmish setup", "requires": ["CORE-1"]})
+
+    assert callTool("read_ticket", {"id": "CORE-1"})["ready"] is True
+    assert callTool("read_ticket", {"id": "CORE-2"})["ready"] is False
+
+
+def testCheckReadyNamesWhatIsBlocking(inRepo: Path) -> None:
+    """
+    Refusing without naming the blocker would leave the agent to work out the reason, which is the inference this tool exists to replace.
+    """
+
+    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
+    callTool("create_ticket", {"key": "CORE", "title": "Skirmish setup", "requires": ["CORE-1"]})
+
+    payload = callTool("check_ready", {"id": "CORE-2"})
+
+    assert payload == {
+        "id": "CORE-2",
+        "ready": False,
+        "blocked_by": [{"id": "CORE-1", "title": "App shell", "status": "todo", "priority": 2, "exists": True}],
+    }
+
+
+def testCheckReadyClearsOnceTheDependencyIsDone(inRepo: Path) -> None:
+    """
+    Readiness is derived on every read rather than stored, so closing a dependency flips the answer with nothing else written.
+    """
+
+    callTool("create_ticket", {"key": "CORE", "title": "App shell"})
+    callTool("create_ticket", {"key": "CORE", "title": "Skirmish setup", "requires": ["CORE-1"]})
+    callTool("set_status", {"id": "CORE-1", "status": "done"})
+
+    payload = callTool("check_ready", {"id": "CORE-2"})
+
+    assert payload["ready"] is True
+    assert payload["blocked_by"] == []
+
+
+def testCheckReadyFlagsAMissingDependency(inRepo: Path) -> None:
+    """
+    A link the agent cannot follow blocks, and it is returned marked rather than reported as a plain refusal.
+    """
+
+    callTool("create_ticket", {"key": "CORE", "title": "Dangling", "requires": ["CORE-99"]})
+
+    payload = callTool("check_ready", {"id": "CORE-1"})
+
+    assert payload["ready"] is False
+    assert payload["blocked_by"] == [{"id": "CORE-99", "title": None, "status": None, "priority": None, "exists": False}]
+
+
+def testCheckReadyOnADoneTicketReturnsNoBlockers(inRepo: Path) -> None:
+    """
+    A finished ticket is not ready and nothing is blocking it, which is the one case where an empty blocker list means finished rather than unblocked.
+    """
+
+    callTool("create_ticket", {"key": "CORE", "title": "Shipped"})
+    callTool("set_status", {"id": "CORE-1", "status": "done"})
+
+    payload = callTool("check_ready", {"id": "CORE-1"})
+
+    assert payload["ready"] is False
+    assert payload["blocked_by"] == []
 
 
 def testReadTicketCarriesUnknownFields(inRepo: Path) -> None:

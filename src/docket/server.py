@@ -32,7 +32,7 @@ from mcp.server import MCPServer
 
 from docket import __version__
 from docket.core.config import Config, discoverConfig
-from docket.core.graph import ResolvedGraph, dependencyContext, resolveGraph, subgraphForId, subgraphForKey
+from docket.core.graph import Readiness, ResolvedGraph, dependencyContext, resolveGraph, subgraphForId, subgraphForKey, ticketReadiness
 from docket.core.mermaid import renderGraph
 from docket.core.store import Store, TicketResult, TicketSet
 from docket.core.ticket import Ticket
@@ -54,6 +54,8 @@ So: use `update_ticket` for title, priority, and dependencies, `set_metadata` fo
 `metadata` is a free-form map any tool or skill can attach entries to. Namespace your key so two consumers never collide, for example `video` rather than `covered`. `set_metadata` touches only the key you name, leaving every other consumer's entries alone.
 
 Dependencies are stored in one direction only. A ticket declares `requires`, and never declares what it blocks. `read_ticket` returns both directions, deriving the reverse side for you.
+
+Whether a ticket can be worked on now is `check_ready`, and reading it off a status list yourself is not. The rule lives in one place so that every caller gets the same answer.
 
 Keys are closed. Call `list_keys` before `create_ticket`. When no existing key fits, ask the user with `AskUserQuestion` whether to add one, and call `add_key` only once they agree.
 """
@@ -101,12 +103,31 @@ async def readTicket(id: str) -> str:
 
     payload: dict[str, Any] = dict(ticket.summary())
     payload["body"] = ticket.body
+    payload["ready"] = ticketReadiness(loaded, id).isReady
     payload["requires"] = context["requires"]
     payload["requiredBy"] = context["requiredBy"]
     payload["metadata"] = ticket.metadata
     payload["extra"] = ticket.extra
 
     return _json(payload)
+
+
+@mcp.tool(name="check_ready")
+async def checkReady(id: str) -> str:
+    """
+    Report whether a ticket can be worked on now, rather than leaving you to work it out.
+
+    Ready means every id in `requires` names a ticket that is done. Only the direct dependencies are consulted, since a done ticket is taken at its word. A dependency naming a ticket that does not exist blocks, and is returned in `blocked_by` with `exists` false.
+
+    A ticket that is itself done is never ready, because there is no work left to be ready for. That case returns an empty `blocked_by`, so an empty list alongside `ready` false means finished rather than unblocked.
+
+    id: The ticket id, for example CORE-14.
+    """
+
+    store: Store = _store()
+    readiness: Readiness = ticketReadiness(store.loadAll(), id)
+
+    return _json({"id": readiness.id, "ready": readiness.isReady, "blocked_by": list(readiness.blockedBy)})
 
 
 @mcp.tool(name="create_ticket")

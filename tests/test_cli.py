@@ -657,6 +657,112 @@ def testStatusPrintsOnlyTheStatus(inRepo: Path, capsys: pytest.CaptureFixture[st
     assert "\x1b" not in out
 
 
+def testReadyPrintsOnlyTheAnswer(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Readiness reads bare for the same reason a status does, so a shell can take the answer as readily as a person.
+    """
+
+    main(["new", "CORE", "Skirmish setup"])
+    capsys.readouterr()
+
+    assert main(["CORE-1", "ready"]) == EXIT_OK
+
+    out: str = capsys.readouterr().out
+
+    assert out == "true\n"
+    assert "\x1b" not in out
+
+
+def testReadyIsFalseWhileADependencyIsOpen(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    An open prerequisite is the case the check exists for, and closing it has to flip the answer.
+    """
+
+    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Deployment", "--requires", "CORE-1"])
+    capsys.readouterr()
+
+    assert main(["CORE-2", "ready"]) == EXIT_OK
+    assert capsys.readouterr().out == "false\n"
+
+    main(["CORE-1", "done"])
+    capsys.readouterr()
+
+    assert main(["CORE-2", "ready"]) == EXIT_OK
+    assert capsys.readouterr().out == "true\n"
+
+
+def testReadyExitsZeroWhenNotReady(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The exit code reports whether the question could be answered, not what the answer was, so a false is a successful read rather than a failure.
+    """
+
+    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Deployment", "--requires", "CORE-1"])
+    capsys.readouterr()
+
+    assert main(["CORE-2", "ready"]) == EXIT_OK
+
+
+def testReadyOnAnUnknownTicketFails(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    A ticket that does not exist has no readiness to report, so it fails the way naming an unknown ticket always does rather than answering false.
+    """
+
+    assert main(["CORE-99", "ready"]) == EXIT_USAGE
+    assert "CORE-99" in capsys.readouterr().err
+
+
+def testListReadyKeepsOnlyUnblockedTickets(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The filter answers "what can I pick up right now", so a blocked ticket and a finished one both fall out of it.
+    """
+
+    main(["new", "CORE", "Skirmish setup"])
+    main(["new", "CORE", "Deployment", "--requires", "CORE-1"])
+    main(["new", "CORE", "Shipped"])
+    main(["CORE-3", "done"])
+    capsys.readouterr()
+
+    assert main(["list", "--ready"]) == EXIT_OK
+
+    out: str = capsys.readouterr().out
+
+    assert "Skirmish setup" in out
+    assert "Deployment" not in out
+    assert "Shipped" not in out
+
+
+def testListReadyComposesWithTheOtherFilters(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Readiness narrows what the other filters already selected rather than replacing them.
+    """
+
+    main(["new", "CORE", "Core work"])
+    main(["new", "GEN", "Gen work"])
+    capsys.readouterr()
+
+    assert main(["list", "CORE", "--ready"]) == EXIT_OK
+
+    out: str = capsys.readouterr().out
+
+    assert "Core work" in out
+    assert "Gen work" not in out
+
+
+def testListReadyJudgesAgainstTheWholeSet(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    A dependency filtered out of the listing still counts, since readiness is a fact about the set rather than about what was displayed.
+    """
+
+    main(["new", "GEN", "Groundwork"])
+    main(["new", "CORE", "Skirmish setup", "--requires", "GEN-1"])
+    capsys.readouterr()
+
+    assert main(["list", "CORE", "--ready"]) == EXIT_OK
+    assert "No tickets matched" in capsys.readouterr().out
+
+
 def testAnUnknownStatusIsRejectedAtTheParser(inRepo: Path) -> None:
     """
     The vocabulary is fixed, so argparse refuses an unrecognized word before the core is reached.

@@ -251,6 +251,7 @@ def buildParser(config: Optional[Config] = None) -> argparse.ArgumentParser:
     listParser.add_argument("-s", "--status", choices=STATUSES, help="Keep only tickets with this status.")
     listParser.add_argument("-k", "--key", help=f"Keep only tickets carrying this key. {keyOptions}")
     listParser.add_argument("-m", "--priority-max", type=int, dest="priorityMax", help=f"Keep only tickets at or below this priority number. {priorityOptions}")
+    listParser.add_argument("-r", "--ready", action="store_true", help="Keep only tickets whose dependencies are all done. A done ticket is never ready, so this never shows one.")
 
     graphParser: argparse.ArgumentParser = commands.add_parser("graph", help="Render the dependency graph as mermaid source.", formatter_class=RichHelpFormatter)
     graphParser.add_argument("scope", nargs="?", metavar="SCOPE", help="What to scope to, read from its own shape: a ticket id, or a key. The flags below are the same two, named explicitly.")
@@ -309,6 +310,7 @@ def buildTicketParser(commands: argparse._SubParsersAction, priorityOptions: str
 
     ticketCommands.add_parser("show", help="Show the ticket with its resolved dependency context. This is what a bare id does.", formatter_class=RichHelpFormatter)
     ticketCommands.add_parser("status", help="Print the ticket's status and nothing else, for a pipe to read.", formatter_class=RichHelpFormatter)
+    ticketCommands.add_parser("ready", help="Print whether every dependency is done, as a bare true or false, for a pipe to read.", formatter_class=RichHelpFormatter)
 
     # One parser per status is what makes 'docket CORE-14 done' work. It also puts the whole vocabulary into the error when a command is misspelled, which a single `choices` list on a value argument could not do.
     for status in STATUSES:

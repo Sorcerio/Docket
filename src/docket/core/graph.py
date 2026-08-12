@@ -58,6 +58,25 @@ class Edge:
     toId: str
 
 
+@dataclass(frozen=True)
+class Readiness:
+    """
+    Whether one ticket can be worked on now, and what stands in the way when it cannot.
+
+    This is derived from the set on every read and never stored, for the same reason a reverse edge is. A stored answer would go stale the moment a dependency was closed.
+    """
+
+    # MARK: Properties
+
+    id: str
+
+    # Whether every dependency is done and there is still work left to do.
+    isReady: bool
+
+    # The resolved records of everything holding this ticket back, in the same shape `dependencyContext` returns. Empty on a ticket that is itself done, since nothing is blocking it.
+    blockedBy: tuple[dict[str, object], ...] = ()
+
+
 @dataclass
 class ResolvedGraph:
     """
@@ -230,12 +249,45 @@ def dependencyContext(ticketSet: TicketSet, ticketId: str) -> dict[str, list[dic
     # A dependency naming a missing id still has to appear, since hiding it would make a broken link invisible to the reader.
     requires: list[dict[str, object]] = []
     for requiredId in ticket.requires:
-        requires.append(_contextEntry(graph, requiredId))
+        requires.append(_contextEntry(ticketSet, requiredId))
 
+    # The reverse direction is the one thing here the set alone cannot answer, which is what the graph is resolved for.
     node: Optional[GraphNode] = graph.nodes.get(ticketId)
-    requiredBy: list[dict[str, object]] = [_contextEntry(graph, dependentId) for dependentId in (node.requiredBy if node is not None else ())]
+    requiredBy: list[dict[str, object]] = [_contextEntry(ticketSet, dependentId) for dependentId in (node.requiredBy if node is not None else ())]
 
     return {"requires": requires, "requiredBy": requiredBy}
+
+
+def ticketReadiness(ticketSet: TicketSet, ticketId: str) -> Readiness:
+    """
+    Decide whether one ticket can be worked on now.
+
+    Ready means every id in `requires` names a ticket that is done. Only the direct dependencies are consulted, because a done ticket is taken at its word. A done dependency with unfinished dependencies of its own is an inconsistency, and reporting that is `validate`'s job rather than this one's.
+
+    A dependency naming a ticket that does not exist blocks, since a link the reader cannot follow is not the same as clear road. A cycle blocks without a special case, because no ticket in one is ever done.
+
+    ticketSet: The loaded tickets.
+    ticketId: The ticket to judge.
+
+    Returns the readiness of that ticket.
+    """
+
+    return _readinessOf(ticketSet, ticketSet.get(ticketId))
+
+
+def readyTickets(ticketSet: TicketSet, tickets: Iterable[Ticket]) -> list[Ticket]:
+    """
+    Select the tickets that can be worked on now, keeping the order they arrived in.
+
+    The whole set is needed to judge any one ticket, so the candidates are passed separately from the set they are judged against. That is what lets a caller filter an already narrowed listing.
+
+    ticketSet: The loaded tickets, which every dependency is looked up in.
+    tickets: The candidates to filter.
+
+    Returns the ready candidates.
+    """
+
+    return [ticket for ticket in tickets if _readinessOf(ticketSet, ticket).isReady]
 
 
 def findCycles(graph: ResolvedGraph) -> list[list[str]]:
@@ -312,21 +364,54 @@ def findCycles(graph: ResolvedGraph) -> list[list[str]]:
     return sorted(cycles)
 
 
-def _contextEntry(graph: ResolvedGraph, ticketId: str) -> dict[str, object]:
+def _readinessOf(ticketSet: TicketSet, ticket: Ticket) -> Readiness:
+    """
+    Judge one already-loaded ticket, which is what both public entry points do their work through.
+
+    ticketSet: The loaded tickets, which every dependency is looked up in.
+    ticket: The ticket to judge.
+
+    Returns the readiness of that ticket.
+    """
+
+    # A finished ticket has no work left to be ready for, so it is not ready and nothing is holding it back.
+    if ticket.isDone:
+        return Readiness(id=ticket.id, isReady=False)
+
+    blockers: list[dict[str, object]] = [_contextEntry(ticketSet, requiredId) for requiredId in ticket.requires if not _isSatisfied(ticketSet, requiredId)]
+
+    return Readiness(id=ticket.id, isReady=not blockers, blockedBy=tuple(blockers))
+
+
+def _isSatisfied(ticketSet: TicketSet, requiredId: str) -> bool:
+    """
+    Report whether one dependency is met.
+
+    requiredId: The id the depending ticket names.
+
+    Returns `True` only when the id names a ticket that exists and is done.
+    """
+
+    required: Optional[Ticket] = ticketSet.tickets.get(requiredId)
+
+    return required is not None and required.isDone
+
+
+def _contextEntry(ticketSet: TicketSet, ticketId: str) -> dict[str, object]:
     """
     Build one resolved dependency record.
 
-    graph: The resolved graph to look the ticket up in.
+    ticketSet: The loaded tickets to look the ticket up in.
     ticketId: The id to describe.
 
     Returns the record, flagged when the id names nothing that exists.
     """
 
-    node: Optional[GraphNode] = graph.nodes.get(ticketId)
-    if node is None:
+    ticket: Optional[Ticket] = ticketSet.tickets.get(ticketId)
+    if ticket is None:
         return {"id": ticketId, "title": None, "status": None, "priority": None, "exists": False}
 
-    return {"id": node.id, "title": node.title, "status": node.status, "priority": node.priority, "exists": True}
+    return {"id": ticket.id, "title": ticket.title, "status": ticket.status, "priority": ticket.priority, "exists": True}
 
 
 def _reachable(graph: ResolvedGraph, startId: str, forward: bool) -> set[str]:
