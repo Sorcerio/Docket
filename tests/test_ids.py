@@ -147,18 +147,17 @@ def testSlugifyFallsBackWhenNothingSurvives(title: str) -> None:
     assert slugify(title) == SLUG_FALLBACK
 
 
-def testSlugifyTruncatesOnATokenBoundary() -> None:
+def testSlugifyCutsAtTheCap() -> None:
     """
-    Truncation prefers a word boundary and never exceeds the cap.
+    Truncation lands wherever the cap falls, mid-token included.
     """
 
     slug: str = slugify("alpha bravo charlie delta echo foxtrot golf hotel india juliet")
 
-    assert len(slug) <= SLUG_MAX_LENGTH
+    assert len(slug) == SLUG_MAX_LENGTH
 
-    # The cut landed on a boundary, so the slug ends with a whole token rather than a fragment.
-    # `india` fits at 47 characters and `juliet` is the token that would have breached the cap.
-    assert slug == "alphaBravoCharlieDeltaEchoFoxtrotGolfHotelIndia"
+    # `india` ends at 47 characters, so the cap takes the first letter of `juliet` with it.
+    assert slug == "alphaBravoCharlieDeltaEchoFoxtrotGolfHotelIndiaJ"[:SLUG_MAX_LENGTH]
 
 
 def testSlugifyHardCutsAnOversizedSingleToken() -> None:
