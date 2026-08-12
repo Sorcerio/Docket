@@ -1015,6 +1015,15 @@ wheels = [
 ]
 
 [[package]]
+name = "textcase"
+version = "0.4.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c0/08/991940591c7a8de25505a4e43642d1c2b54f43c3ed76f8c90f1df6ee9525/textcase-0.4.5.tar.gz", hash = "sha256:97fd08754b7dba9bfa5daf4ace474645f6b66409fb00f483c5de729e730f8e52", size = 6988, upload-time = "2025-10-10T15:11:25.476Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5b/48/6ea42c749608cfca883d5d8fae03edbcde636090d2bc751fd5da9157b451/textcase-0.4.5-py3-none-any.whl", hash = "sha256:bd5d6aaf653b339e3ac60ad96cfc960a94219a97da464eddeed7084f41774937", size = 6503, upload-time = "2025-10-10T15:11:24.294Z" },
+]
+
+[[package]]
 name = "ticket-docket"
 source = { editable = "." }
 dependencies = [
@@ -1023,6 +1032,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "rich" },
     { name = "rich-argparse" },
+    { name = "textcase" },
     { name = "tomlkit" },
 ]
 
@@ -1039,6 +1049,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "rich", specifier = ">=15.0.0" },
     { name = "rich-argparse", specifier = ">=1.8.0" },
+    { name = "textcase", specifier = ">=0.4.5" },
     { name = "tomlkit", specifier = ">=0.15.1" },
 ]
 
