@@ -1,7 +1,7 @@
 ---
 id: FEAT-13
 title: Check if Ticket is Ready For Work
-status: todo
+status: done
 priority: 1
 requires: []
 metadata: {}
