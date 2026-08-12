@@ -52,19 +52,20 @@ def testTheDocumentedShapeIsProduced() -> None:
     expected: str = (
         "graph TD\n"
         "  subgraph CORE\n"
-        '    CORE_9["CORE-9 App shell<br/>p0 done"]\n'
-        '    CORE_14["CORE-14 Skirmish setup<br/>p1 todo"]\n'
+        '    CORE_9("CORE-9<br/>App shell<br/>p0 done")\n'
+        '    CORE_14["CORE-14<br/>Skirmish setup<br/>p1 todo"]\n'
         "  end\n"
         "  subgraph GEN\n"
-        '    GEN_3["GEN-3 Multi-layer battlescape<br/>p2 todo"]\n'
+        '    GEN_3["GEN-3<br/>Multi-layer battlescape<br/>p2 todo"]\n'
         "  end\n"
         "  CORE_9 --> CORE_14\n"
         "  GEN_3 --> CORE_14\n"
-        "  classDef todo fill:#495057,color:#fff\n"
-        "  classDef wip fill:#9a6700,color:#fff\n"
-        "  classDef done fill:#2d6a4f,color:#fff\n"
-        "  class CORE_9 done\n"
-        "  class CORE_14,GEN_3 todo\n"
+        "  classDef doneP0 fill:#2d6a4f,color:#fff,stroke:#ff6b6b,stroke-width:4px\n"
+        "  classDef todoP1 fill:#495057,color:#fff,stroke:#ff922b,stroke-width:3px\n"
+        "  classDef todoP2 fill:#495057,color:#fff,stroke:#ffd43b,stroke-width:2px\n"
+        "  class CORE_9 doneP0\n"
+        "  class CORE_14 todoP1\n"
+        "  class GEN_3 todoP2\n"
     )
 
     assert renderGraph(resolveGraph(ticketSet)) == expected
@@ -77,22 +78,117 @@ def testTheHyphenatedIdStaysInTheLabel() -> None:
 
     output: str = renderGraph(resolveGraph(buildSet(("CORE-14", "Skirmish setup", "todo", 1, []))))
 
-    assert 'CORE_14["CORE-14 Skirmish setup' in output
+    assert 'CORE_14["CORE-14<br/>Skirmish setup' in output
 
 
-def testPriorityIsInTheLabelNotTheStyling() -> None:
+def testPriorityAndStatusSurviveWithoutClasses() -> None:
     """
-    Priority must survive in a renderer that ignores classes entirely, so it lives in the label.
+    Both readings must survive a renderer that ignores classes entirely, so the label carries the priority and the shape carries the status.
     """
 
-    output: str = renderGraph(resolveGraph(buildSet(("CORE-1", "A", "todo", 3, []))))
+    output: str = renderGraph(resolveGraph(buildSet(("CORE-1", "A", "wip", 3, []))))
 
-    assert "<br/>p3 todo" in output
+    # Dropping every style line still leaves the priority written out and the status shaped.
+    assert "<br/>p3 wip" in output
+    assert 'CORE_1{{"CORE-1' in output
 
-    # No style line mentions the priority, so a renderer that drops classes loses nothing.
-    for line in output.splitlines():
-        if line.strip().startswith(("classDef", "class ")):
-            assert "p3" not in line
+
+def testStatusPicksTheNodeShape() -> None:
+    """
+    Status is said twice, and the shape is the half of it that no renderer can drop.
+    """
+
+    ticketSet: TicketSet = buildSet(
+        ("CORE-1", "A", "todo", 2, []),
+        ("CORE-2", "B", "wip", 2, []),
+        ("CORE-3", "C", "done", 2, []),
+    )
+
+    output: str = renderGraph(resolveGraph(ticketSet))
+
+    assert 'CORE_1["CORE-1<br/>A<br/>p2 todo"]' in output
+    assert 'CORE_2{{"CORE-2<br/>B<br/>p2 wip"}}' in output
+    assert 'CORE_3("CORE-3<br/>C<br/>p2 done")' in output
+
+
+def testPriorityPicksTheBorderWeight() -> None:
+    """
+    Urgency reads as visual weight and color, so a lower priority number takes a heavier and more saturated border.
+    """
+
+    output: str = renderGraph(resolveGraph(buildSet(("CORE-1", "A", "todo", 0, []), ("CORE-2", "B", "todo", 2, []))))
+
+    assert "classDef todoP0 fill:#495057,color:#fff,stroke:#ff6b6b,stroke-width:4px" in output
+    assert "classDef todoP2 fill:#495057,color:#fff,stroke:#ffd43b,stroke-width:2px" in output
+
+
+def testTheRampDrainsToNeutralRatherThanToGreen() -> None:
+    """
+    Green already means done, so a low-priority todo must not wear the color of finished work. Draining to grey also stays ordered for a reader who cannot separate red from green.
+    """
+
+    ticketSet: TicketSet = buildSet(*((f"CORE-{priority + 1}", "A", "todo", priority, []) for priority in range(5)))
+
+    output: str = renderGraph(resolveGraph(ticketSet))
+
+    # The last two bands are the neutrals the ramp ends on, and no band anywhere is a green.
+    assert "classDef todoP3 fill:#495057,color:#fff,stroke:#adb5bd,stroke-width:2px" in output
+    assert "classDef todoP4 fill:#495057,color:#fff,stroke:#6c757d,stroke-width:1px" in output
+    assert "stroke:#2d6a4f" not in output
+
+
+def testAPriorityPastTheBandSharesTheLightestBorder() -> None:
+    """
+    The configured ceiling can sit anywhere, so everything past the last band shares its border rather than inventing a class per number.
+    """
+
+    output: str = renderGraph(resolveGraph(buildSet(("CORE-1", "A", "todo", 4, []), ("CORE-2", "B", "todo", 9, []))))
+
+    # Both nodes land in the same class, so the priority they differ by shows only in the label.
+    assert "  class CORE_1,CORE_2 todoP4\n" in output
+    assert "todoP9" not in output
+    assert "<br/>p9 todo" in output
+
+
+def testOnlyTheCombinationsPresentAreDeclared() -> None:
+    """
+    A class pairs a status with a priority, so declaring every pairing would declare mostly classes nothing takes.
+    """
+
+    output: str = renderGraph(resolveGraph(buildSet(("CORE-1", "A", "todo", 2, []))))
+
+    assert "classDef todoP2" in output
+    assert output.count("classDef") == 1
+
+
+def testALongTitleWrapsAcrossLines() -> None:
+    """
+    Mermaid lays a label out on one line, so one long title would stretch every node beside it.
+    """
+
+    output: str = renderGraph(resolveGraph(buildSet(("CORE-1", "Key Removal Checks Usage Outside the Lock", "todo", 2, []))))
+
+    assert 'CORE_1["CORE-1<br/>Key Removal Checks Usage<br/>Outside the Lock<br/>p2 todo"]' in output
+
+
+def testALongWordIsNotBroken() -> None:
+    """
+    Breaking an id or a path mid-word costs the reader more than the width does.
+    """
+
+    output: str = renderGraph(resolveGraph(buildSet(("CORE-1", "Supercalifragilisticexpialidocious", "todo", 2, []))))
+
+    assert "Supercalifragilisticexpialidocious" in output
+
+
+def testAnEmptyTitleLeavesNoBlankLine() -> None:
+    """
+    A title nobody wrote produces no line at all, rather than a gap between the id and the meta line.
+    """
+
+    output: str = renderGraph(resolveGraph(buildSet(("CORE-1", "", "todo", 2, []))))
+
+    assert 'CORE_1["CORE-1<br/>p2 todo"]' in output
 
 
 def testOneSubgraphPerKey() -> None:
@@ -104,18 +200,6 @@ def testOneSubgraphPerKey() -> None:
 
     assert output.count("subgraph ") == 2
     assert output.count("  end\n") == 2
-
-
-def testEveryStatusClassIsDeclared() -> None:
-    """
-    One `classDef` per status, whether or not every status is currently in use.
-    """
-
-    output: str = renderGraph(resolveGraph(buildSet(("CORE-1", "A", "todo", 2, []))))
-
-    assert "classDef todo" in output
-    assert "classDef wip" in output
-    assert "classDef done" in output
 
 
 def testNodesAreGroupedIntoOneClassLine() -> None:
@@ -131,8 +215,8 @@ def testNodesAreGroupedIntoOneClassLine() -> None:
 
     output: str = renderGraph(resolveGraph(ticketSet))
 
-    assert "  class CORE_1,CORE_2 todo\n" in output
-    assert "  class CORE_3 done\n" in output
+    assert "  class CORE_1,CORE_2 todoP2\n" in output
+    assert "  class CORE_3 doneP2\n" in output
 
 
 def testExternalNodesAreStyledSeparately() -> None:
@@ -149,7 +233,7 @@ def testExternalNodesAreStyledSeparately() -> None:
 
     assert "classDef external" in output
     assert "  class CORE_9 external\n" in output
-    assert "  class GEN_1 todo\n" in output
+    assert "  class GEN_1 todoP2\n" in output
 
     # The borrowed node keeps its own key's subgraph, so the reader still sees where it came from.
     assert "subgraph CORE" in output
@@ -178,7 +262,8 @@ def testAnUnrecognizedStatusIsLeftUnstyled() -> None:
 
     output: str = renderGraph(resolveGraph(buildSet(("CORE-1", "A", "blocked", 2, []))))
 
-    assert 'CORE_1["CORE-1 A<br/>p2 blocked"]' in output
+    # It takes the plain shape too, since inventing one would claim to know what the status means.
+    assert 'CORE_1["CORE-1<br/>A<br/>p2 blocked"]' in output
     assert "class CORE_1" not in output
 
 
@@ -189,7 +274,7 @@ def testLabelsEscapeQuotesAndAngleBrackets() -> None:
 
     output: str = renderGraph(resolveGraph(buildSet(("CORE-1", 'The "big" <fix>', "todo", 2, []))))
 
-    assert 'CORE_1["CORE-1 The #quot;big#quot; &lt;fix&gt;<br/>p2 todo"]' in output
+    assert 'CORE_1["CORE-1<br/>The #quot;big#quot; &lt;fix&gt;<br/>p2 todo"]' in output
 
 
 def testAmpersandIsEscapedOnlyOnce() -> None:
