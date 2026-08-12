@@ -59,6 +59,7 @@ Filenames are frozen at creation. Retitling a ticket deliberately does not renam
 |---|---|
 | See what exists | `list_tickets` |
 | Read one ticket in full | `read_ticket` |
+| Check a ticket can be worked on | `check_ready` |
 | Create a ticket | `create_ticket` |
 | See the dependency graph | `graph` |
 | See valid keys | `list_keys` |
@@ -70,6 +71,8 @@ Filenames are frozen at creation. Retitling a ticket deliberately does not renam
 A ticket declares what it `requires`. It never declares what it blocks.
 
 The reverse direction is derived, not stored. `read_ticket` returns both, so to find out what a ticket is blocking, read it and look at `requiredBy`. Do not add a "blocks" field. Storing both directions guarantees they eventually disagree, which is exactly what this design exists to prevent.
+
+Whether a ticket is ready to be worked on is derived the same way. Call `check_ready` rather than listing statuses and deciding for yourself, so that every caller gets the same answer from the same rule. Ready means every id in `requires` names a ticket that is `done`, a missing dependency blocks, and a ticket that is already `done` is never ready.
 
 To change one edge, use `update_ticket` with `requires_add` or `requires_remove` rather than reading the list and passing it back with one entry different. Those edit the list in place, so nothing you did not name is at risk. Reserve `requires` for when you genuinely mean to replace the whole list, and never pass it in the same call as an edit, which is refused.
 

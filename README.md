@@ -87,6 +87,7 @@ A ticket id is the command:
 ```bash
 docket CORE-14         # show it, dependency context and all
 docket CORE-14 status  # bare word, for a pipe
+docket CORE-14 ready   # true or false. Every dependency done?
 docket CORE-14 done    # todo, wip, or done. The file follows
 docket CORE-14 set [-t TEXT] [-p N] [-r A,B|none] [-ra A,B] [-rr A,B]
 docket CORE-14 meta [KEY [VALUE]] [-c]
@@ -96,7 +97,7 @@ Everything else works on the set:
 
 ```bash
 docket new CORE "Skirmish setup" [-r CORE-9,GEN-3] [-p 1] [-b TEXT]
-docket list [-s todo] [-k CORE] [-m 2]
+docket list [-s todo] [-k CORE] [-m 2] [-r]
 docket graph [-i CORE-14 | -k GEN] [-o FILE]
 docket key list | add KEY "desc" [-r TEXT] | remove KEY
 docket validate | deploy PATH | upgrade PATH
@@ -104,16 +105,19 @@ docket validate | deploy PATH | upgrade PATH
 
 `-r` replaces the dependency list. `-ra` and `-rr` edit the one already there. Both in one call is refused.
 
+A ticket is ready when every id in its `requires` names a ticket that is `done`. A missing dependency blocks, and a `done` ticket is never ready, so `docket list -r` is the set you can pick up right now.
+
 Every short flag has a long form (`-k/--key`, `-p/--priority`, `-m/--priority-max`, and so on). `--help` lists your actual keys and priority range.
 
 ## MCP
 
-`docket-mcp` is a stdio server. Ten tools, each returning JSON as text.
+`docket-mcp` is a stdio server. Eleven tools, each returning JSON as text.
 
 | Tool | Purpose |
 |---|---|
 | `list_tickets(status?, key?, priority_max?)` | Summaries only, never bodies. |
 | `read_ticket(id)` | Full body plus both dependency directions. |
+| `check_ready(id)` | Whether every dependency is done, and what is blocking. |
 | `create_ticket(key, title, body?, requires?, priority?)` | Allocates the id, writes the file. |
 | `update_ticket(id, title?, priority?, requires?, requires_add?, requires_remove?)` | Those three fields only. |
 | `set_status(id, status)` | Writes frontmatter and moves the file together. |

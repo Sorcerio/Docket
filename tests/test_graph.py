@@ -1,14 +1,14 @@
 """
 Graph Tests
 
-Cover reverse edge derivation, scoped traversal, dependency context, and cycle detection.
+Cover reverse edge derivation, scoped traversal, dependency context, readiness, and cycle detection.
 """
 
 # MARK: Imports
 
 import pytest
 
-from docket.core.graph import Edge, ResolvedGraph, dependencyContext, findCycles, resolveGraph, subgraphForId, subgraphForKey
+from docket.core.graph import Edge, Readiness, ResolvedGraph, dependencyContext, findCycles, readyTickets, resolveGraph, subgraphForId, subgraphForKey, ticketReadiness
 from docket.core.store import TicketSet
 from docket.core.ticket import Ticket
 
@@ -27,6 +27,23 @@ def buildSet(*specs: tuple[str, list[str]]) -> TicketSet:
     ticketSet: TicketSet = TicketSet()
     for ticketId, requires in specs:
         ticketSet.tickets[ticketId] = Ticket(id=ticketId, title=f"Title {ticketId}", status="todo", priority=2, requires=list(requires))
+
+    return ticketSet
+
+
+def buildStatusSet(*specs: tuple[str, str, list[str]]) -> TicketSet:
+    """
+    Build a ticket set whose statuses differ, which is what every readiness case turns on.
+
+    specs: Triples of a ticket id, its status, and the ids it requires.
+
+    Returns the assembled set.
+    """
+
+    ticketSet: TicketSet = buildSet(*[(ticketId, requires) for ticketId, _, requires in specs])
+
+    for ticketId, status, _ in specs:
+        ticketSet.tickets[ticketId].status = status
 
     return ticketSet
 
@@ -191,6 +208,109 @@ def testDependencyContextReportsAMissingDependency() -> None:
     context = dependencyContext(buildSet(("CORE-1", ["CORE-99"])), "CORE-1")
 
     assert context["requires"] == [{"id": "CORE-99", "title": None, "status": None, "priority": None, "exists": False}]
+
+
+def testATicketWithNoDependenciesIsReady() -> None:
+    """
+    Nothing to wait on is the common case, so it needs no special handling to come back ready.
+    """
+
+    assert ticketReadiness(buildSet(("CORE-1", [])), "CORE-1") == Readiness(id="CORE-1", isReady=True, blockedBy=())
+
+
+def testEveryDependencyDoneMakesATicketReady() -> None:
+    """
+    Ready is the whole question the check exists to answer, and this is the shape of a yes.
+    """
+
+    ticketSet: TicketSet = buildStatusSet(("CORE-9", "done", []), ("GEN-3", "done", []), ("CORE-14", "todo", ["CORE-9", "GEN-3"]))
+
+    assert ticketReadiness(ticketSet, "CORE-14").isReady
+
+
+def testOneUnfinishedDependencyBlocks() -> None:
+    """
+    A single open prerequisite is enough, and the answer has to name it rather than only refusing.
+    """
+
+    ticketSet: TicketSet = buildStatusSet(("CORE-9", "done", []), ("GEN-3", "wip", []), ("CORE-14", "todo", ["CORE-9", "GEN-3"]))
+
+    readiness: Readiness = ticketReadiness(ticketSet, "CORE-14")
+
+    assert not readiness.isReady
+    assert readiness.blockedBy == ({"id": "GEN-3", "title": "Title GEN-3", "status": "wip", "priority": 2, "exists": True},)
+
+
+def testAMissingDependencyBlocks() -> None:
+    """
+    A link the reader cannot follow is not the same as clear road, so it blocks and stays visible.
+    """
+
+    readiness: Readiness = ticketReadiness(buildSet(("CORE-14", ["CORE-99"])), "CORE-14")
+
+    assert not readiness.isReady
+    assert readiness.blockedBy == ({"id": "CORE-99", "title": None, "status": None, "priority": None, "exists": False},)
+
+
+def testAWipTicketCanStillBeReady() -> None:
+    """
+    Readiness asks about the dependencies, so work already started does not change the answer.
+    """
+
+    assert ticketReadiness(buildStatusSet(("CORE-1", "wip", [])), "CORE-1").isReady
+
+
+def testADoneTicketIsNeverReady() -> None:
+    """
+    There is no work left to be ready for, and an empty blocker list is what tells the two apart from being unblocked.
+    """
+
+    readiness: Readiness = ticketReadiness(buildStatusSet(("CORE-9", "done", []), ("CORE-14", "done", ["CORE-9"])), "CORE-14")
+
+    assert not readiness.isReady
+    assert readiness.blockedBy == ()
+
+
+def testOnlyDirectDependenciesAreConsulted() -> None:
+    """
+    A done dependency is taken at its word, since an unfinished dependency behind it is `validate`'s finding rather than this rule's.
+    """
+
+    ticketSet: TicketSet = buildStatusSet(("CORE-1", "todo", []), ("CORE-9", "done", ["CORE-1"]), ("CORE-14", "todo", ["CORE-9"]))
+
+    assert ticketReadiness(ticketSet, "CORE-14").isReady
+
+
+def testACycleBlocksWithoutASpecialCase() -> None:
+    """
+    No ticket in a cycle can be done, so each one blocks the next by the ordinary rule.
+    """
+
+    ticketSet: TicketSet = buildSet(("CORE-1", ["CORE-2"]), ("CORE-2", ["CORE-1"]))
+
+    assert not ticketReadiness(ticketSet, "CORE-1").isReady
+    assert not ticketReadiness(ticketSet, "CORE-2").isReady
+
+
+def testReadyTicketsFiltersAndKeepsOrder() -> None:
+    """
+    A listing is already ordered by the time it is filtered, so the filter must not reorder what survives.
+    """
+
+    ticketSet: TicketSet = buildStatusSet(("CORE-9", "done", []), ("CORE-1", "todo", []), ("CORE-2", "todo", ["CORE-1"]), ("CORE-3", "todo", ["CORE-9"]))
+    candidates: list[Ticket] = [ticketSet.tickets[ticketId] for ticketId in ("CORE-3", "CORE-2", "CORE-1")]
+
+    assert [ticket.id for ticket in readyTickets(ticketSet, candidates)] == ["CORE-3", "CORE-1"]
+
+
+def testReadyTicketsJudgesAgainstTheWholeSet() -> None:
+    """
+    A dependency may well have been filtered out of the listing, so the candidates and the set they are judged against are separate arguments.
+    """
+
+    ticketSet: TicketSet = buildStatusSet(("CORE-9", "done", []), ("CORE-14", "todo", ["CORE-9"]))
+
+    assert [ticket.id for ticket in readyTickets(ticketSet, [ticketSet.tickets["CORE-14"]])] == ["CORE-14"]
 
 
 def testNoCyclesOnAnAcyclicGraph() -> None:

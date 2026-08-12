@@ -18,7 +18,7 @@ from docket.cli.grammar import EXIT_INVALID, EXIT_OK, EXIT_USAGE, OUT_ARGUMENT, 
 from docket.cli.output import STATUS_STYLES, Output, buildContextTable, relativeToRoot
 from docket.core.config import Config
 from docket.core.deploy import DeployReport, deploy, upgrade
-from docket.core.graph import ResolvedGraph, dependencyContext, resolveGraph, subgraphForId, subgraphForKey
+from docket.core.graph import Readiness, ResolvedGraph, dependencyContext, readyTickets, resolveGraph, subgraphForId, subgraphForKey, ticketReadiness
 from docket.core.inputs import requireWritableFile, writeFile
 from docket.core.mermaid import renderGraph
 from docket.core.store import Store, TicketResult, TicketSet
@@ -49,6 +49,7 @@ def commandTicket(args: argparse.Namespace, store: Store, output: Output) -> int
         None: commandShow,
         "show": commandShow,
         "status": commandStatusRead,
+        "ready": commandReady,
         "set": commandSet,
         "meta": commandMeta,
     }
@@ -133,7 +134,12 @@ def commandList(args: argparse.Namespace, store: Store, output: Output) -> int:
     if key is not None:
         store.config.requireKnownKey(key)
 
-    tickets: list[Ticket] = store.loadAll().filtered(status=status, key=key, priorityMax=priorityMax)
+    loaded: TicketSet = store.loadAll()
+    tickets: list[Ticket] = loaded.filtered(status=status, key=key, priorityMax=priorityMax)
+
+    # Readiness is judged against the whole set rather than the narrowed one, since a dependency may well have been filtered out of the listing.
+    if args.ready:
+        tickets = readyTickets(loaded, tickets)
 
     if not tickets:
         output.print("[dim]No tickets matched.[/dim]")
@@ -221,6 +227,26 @@ def commandStatusRead(args: argparse.Namespace, store: Store, output: Output) ->
     ticket: Ticket = store.load(args.id)
 
     output.raw(f"{ticket.status}\n")
+
+    return EXIT_OK
+
+
+def commandReady(args: argparse.Namespace, store: Store, output: Output) -> int:
+    """
+    Print whether a ticket's dependencies are all done, and nothing else.
+
+    This goes out raw for the same reason `status` does. What is blocking is deliberately left to `show`, which already tables both dependency directions with their statuses.
+
+    args: The parsed arguments.
+    store: The store to read from.
+    output: Where to write.
+
+    Returns the process exit code, which reports whether the question could be answered rather than what the answer was.
+    """
+
+    readiness: Readiness = ticketReadiness(store.loadAll(), args.id)
+
+    output.raw(f"{'true' if readiness.isReady else 'false'}\n")
 
     return EXIT_OK
 
