@@ -186,6 +186,30 @@ def testCreateAllocatesTheNextIdAndWritesTheFile(store: Store, config: Config) -
     assert "# Skirmish Setup" in path.read_text(encoding="utf-8")
 
 
+def testCreateConvertsTheTitleEverywhereItLands(store: Store, config: Config) -> None:
+    """
+    The conversion runs once, before anything derives from the title, so the stored field, the body heading, and the slug cannot disagree.
+    """
+
+    result: TicketResult = store.create(key="CORE", title="record demo gif")
+
+    assert result.ticket.title == "Record Demo Gif"
+
+    path: Path = config.todoPath / "CORE-1_recordDemoGif.md"
+    assert path.is_file()
+    assert "# Record Demo Gif" in path.read_text(encoding="utf-8")
+
+
+def testUpdateConvertsTheTitle(store: Store) -> None:
+    """
+    Retitling goes through the same conversion, so a title cannot be lowered back in after creation.
+    """
+
+    store.create(key="CORE", title="Original Title")
+
+    assert store.update("CORE-1", title="a completely different title").ticket.title == "A Completely Different Title"
+
+
 def testCreateContinuesNumberingFromExistingTickets(store: Store, config: Config) -> None:
     """
     The next number comes from scanning, with no counter file to desynchronize.

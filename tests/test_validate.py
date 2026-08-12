@@ -19,6 +19,7 @@ from docket.core.validate import (
     RULE_MISSING_DEPENDENCY,
     RULE_PRIORITY_RANGE,
     RULE_STATUS_DIRECTORY,
+    RULE_TITLE_CASE,
     RULE_UNKNOWN_KEY,
     RULE_UNKNOWN_STATUS,
     RULE_UNREADABLE,
@@ -352,6 +353,54 @@ def testAnAlreadyLoadedSetIsReused(store: Store, config: Config) -> None:
     loaded = store.loadAll()
 
     assert validate(store, loaded).isValid
+
+
+def testATitleThatIsNotTitleCaseIsAWarning(store: Store, config: Config) -> None:
+    """
+    A badly cased title still names the work, so it informs rather than blocks.
+    """
+
+    writeRaw(config, "todo", "CORE-1_a.md", makeText("CORE-1", title="record demo gif"))
+
+    report: ValidationReport = validate(store)
+
+    # Warnings alone leave the set valid, which is what keeps this out of a pre-commit hook's way.
+    assert report.isValid
+    assert rules(report) == [RULE_TITLE_CASE]
+    assert report.warnings[0].severity == SEVERITY_WARNING
+    assert report.warnings[0].ticketId == "CORE-1"
+
+
+def testTheTitleCaseWarningNamesTheCorrectedTitle(store: Store, config: Config) -> None:
+    """
+    The correction travels in the message, so a human or an agent can act on it without working out the convention first.
+    """
+
+    writeRaw(config, "todo", "CORE-1_a.md", makeText("CORE-1", title="key removal checks usage outside the lock"))
+
+    report: ValidationReport = validate(store)
+
+    assert "Key Removal Checks Usage Outside the Lock" in report.warnings[0].message
+
+
+def testATitleCaseTitleIsNotWarnedAbout(store: Store, config: Config) -> None:
+    """
+    An acronym must not be flagged, since the rule leaves a word carrying its own case alone.
+    """
+
+    writeRaw(config, "todo", "CORE-1_a.md", makeText("CORE-1", title="Add to Requires in CLI"))
+
+    assert validate(store).findings == []
+
+
+def testAWrittenTicketNeverTripsTheTitleRule(store: Store) -> None:
+    """
+    Every write converts the title, so the rule can only ever fire on a hand-edited file or one written before it existed.
+    """
+
+    store.create(key="CORE", title="record demo gif")
+
+    assert validate(store).findings == []
 
 
 def testFindingsAreOrderedByTicket(store: Store, config: Config) -> None:
