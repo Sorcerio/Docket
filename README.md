@@ -101,7 +101,7 @@ docket list [-s todo] [-k CORE] [-m 2] [-r]
 docket graph [-i CORE-14 | -k GEN | -s todo] [-o FILE]
 docket key list | add KEY "desc" [-r TEXT] | remove KEY
 docket validate | deploy PATH | upgrade PATH
-docket docs handoff
+docket docs handoff [-o FILE]
 ```
 
 `-r` replaces the dependency list. `-ra` and `-rr` edit the one already there. Both in one call is refused.

@@ -41,7 +41,7 @@ def requireWritableFile(path: str, name: str) -> Path:
     The checks that can be made without touching the disk are made here, so a caller learns the destination is unusable before any work is done for it. A filesystem may still refuse the write afterwards for a reason no check can predict, which is why `writeFile` exists to catch that too.
 
     path: The destination as the caller supplied it.
-    name: What to name in the error message, for example `--out path`.
+    name: What to name in the error message, for example `--output path`.
 
     Returns the destination as a `Path`.
     """
@@ -74,7 +74,7 @@ def writeFile(path: Path, text: str, name: str) -> Path:
 
     path: The destination, already checked.
     text: The content to write.
-    name: What to name in the error message, for example `--out path`.
+    name: What to name in the error message, for example `--output path`.
 
     Returns the path written.
     """

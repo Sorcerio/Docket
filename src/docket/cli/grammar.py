@@ -41,8 +41,8 @@ TOKEN_PRIORITY: str = "priority"
 # The word that clears a comma-separated list argument. An id can never collide with it, since every id is an uppercase key followed by a hyphen and a number.
 CLEAR_SENTINEL: str = "none"
 
-# How the graph destination is named when a message has to talk about it.
-OUT_ARGUMENT: str = "--out path"
+# How a destination is named when a message has to talk about it. The graph and the shipped documents share the flag, so they share its name too.
+OUTPUT_ARGUMENT: str = "--output path"
 
 # MARK: Functions
 
@@ -265,7 +265,7 @@ def buildParser(config: Optional[Config] = None) -> argparse.ArgumentParser:
     graphScope.add_argument("-i", "--id", help="Scope to one ticket's ancestors and descendants.")
     graphScope.add_argument("-k", "--key", help=f"Scope to one key, plus its immediate cross-key neighbors. {keyOptions}")
     graphScope.add_argument("-s", "--status", choices=STATUSES, help="Scope to the tickets with this status alone. Nothing outside it is borrowed, so an edge survives only when both of its ends carry the status.")
-    graphParser.add_argument("-o", "--out", help="Write to a file rather than to stdout.")
+    graphParser.add_argument("-o", "--output", help="Write to a file rather than to stdout.")
 
     keyParser: argparse.ArgumentParser = commands.add_parser("key", help="Inspect and manage the key registry.", formatter_class=RichHelpFormatter)
     keyCommands = keyParser.add_subparsers(dest="keyCommand", metavar="SUBCOMMAND")
@@ -284,7 +284,16 @@ def buildParser(config: Optional[Config] = None) -> argparse.ArgumentParser:
     docsParser: argparse.ArgumentParser = commands.add_parser("docs", help="Print a document docket ships, rendered for this repository.", formatter_class=RichHelpFormatter)
     docsCommands = docsParser.add_subparsers(dest="docsCommand", metavar="SUBCOMMAND")
 
-    docsCommands.add_parser("handoff", help="Print the brief that teaches a chat system with no access to this repository how to write tickets for it by hand.", formatter_class=RichHelpFormatter)
+    # Every document is written the same two ways, so the destination is declared once here and inherited by each one rather than repeated per document.
+    docsOutput: argparse.ArgumentParser = argparse.ArgumentParser(add_help=False)
+    docsOutput.add_argument("-o", "--output", help="Write to a file rather than to stdout.")
+
+    docsCommands.add_parser(
+        "handoff",
+        help="Print the brief that teaches a chat system with no access to this repository how to write tickets for it by hand.",
+        parents=[docsOutput],
+        formatter_class=RichHelpFormatter,
+    )
 
     commands.add_parser("validate", help="Run every integrity rule.", formatter_class=RichHelpFormatter)
 

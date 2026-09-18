@@ -472,10 +472,10 @@ def testGraphRefusesAnUnwritableOutPath(inRepo: Path, capsys: pytest.CaptureFixt
     main(["new", "CORE", "Skirmish Setup"])
     capsys.readouterr()
 
-    assert main(["graph", "--out", ""]) == EXIT_USAGE
+    assert main(["graph", "--output", ""]) == EXIT_USAGE
     assert "cannot be empty" in capsys.readouterr().err
 
-    assert main(["graph", "--out", str(inRepo)]) == EXIT_USAGE
+    assert main(["graph", "--output", str(inRepo)]) == EXIT_USAGE
     assert "is a directory" in capsys.readouterr().err
 
 
@@ -489,7 +489,7 @@ def testGraphWritesToANestedOutPath(inRepo: Path, capsys: pytest.CaptureFixture[
 
     target: Path = inRepo / "build" / "graphs" / "docket.mmd"
 
-    assert main(["graph", "--out", str(target)]) == EXIT_OK
+    assert main(["graph", "--output", str(target)]) == EXIT_OK
     assert "graph TD" in target.read_text(encoding="utf-8")
 
 
@@ -820,6 +820,35 @@ def testDocsHandoffRendersOutsideARepository(tmp_path: Path, capsys: pytest.Capt
     assert "No keys were available" in capsys.readouterr().out
 
 
+def testDocsHandoffWritesToAnOutputPath(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The brief is carried somewhere else, so writing it straight to a file saves the redirect a person would otherwise have to type.
+    """
+
+    target: Path = inRepo / "handoff" / "brief.md"
+
+    assert main(["docs", "handoff", "--output", str(target)]) == EXIT_OK
+    assert "Wrote" in capsys.readouterr().out
+
+    # The file holds the document itself, rendered for this repository rather than the fallback.
+    written: str = target.read_text(encoding="utf-8")
+
+    assert written.startswith("# Writing Tickets for Docket, Offsite")
+    assert "`CORE-1`" in written
+
+
+def testDocsHandoffRefusesAnUnwritableOutputPath(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    A destination is checked the same way the graph destination is, since both leave through one emitter.
+    """
+
+    assert main(["docs", "handoff", "-o", ""]) == EXIT_USAGE
+    assert "cannot be empty" in capsys.readouterr().err
+
+    assert main(["docs", "handoff", "-o", str(inRepo)]) == EXIT_USAGE
+    assert "is a directory" in capsys.readouterr().err
+
+
 def testDocsRefusesAnUnknownSubcommand(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """
     Naming the group alone is a usage error that says what the group accepts, matching how the key group answers the same mistake.
@@ -869,7 +898,7 @@ def testGraphWritesToAFile(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> 
 
     target: Path = inRepo / "out" / "graph.mmd"
 
-    assert main(["graph", "--out", str(target)]) == EXIT_OK
+    assert main(["graph", "--output", str(target)]) == EXIT_OK
     assert target.read_text(encoding="utf-8").startswith("graph TD\n")
 
 
