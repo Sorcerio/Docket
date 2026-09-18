@@ -53,6 +53,12 @@ Never move a file between `todo/` and `done/` yourself. The `status` field is th
 
 Filenames are frozen at creation. Retitling a ticket deliberately does not rename its file, because renaming would break every prose cross-reference pointing at it from other tickets. Do not rename one to "fix" a stale slug. It is stale on purpose.
 
+## Tickets written outside this repository
+
+Docket ships a second document, printed by `docket docs handoff`, written for a chat system that has no access to this repository and has to write ticket files by hand.
+
+Its rules are deliberately the opposite of the ones above, because its reader has no tools to call. Do not follow it here. A file produced that way is an ordinary ticket the moment it lands, so `validate` is what confirms it and the tools above are what change it afterwards.
+
 ## Titles are title case
 
 `create_ticket` and `update_ticket` convert the `title` for you, so write one however reads naturally and let the tool case it. Do not hand-edit a title in the frontmatter to fix its casing, because that is a frontmatter field and `update_ticket` owns it.

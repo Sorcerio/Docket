@@ -1,0 +1,139 @@
+# Writing Tickets for Docket, Offsite
+
+You are being asked to write tickets for a Docket repository you cannot reach.
+
+Docket is a ticketing system where every ticket is a markdown file with a YAML frontmatter block, kept inside the repository it describes. Normally an agent writes tickets through Docket's own tools. You have no such tools and no view of the repository, so you will write the files by hand as text, and the person you are talking to will carry them to the repository themselves.
+
+This document is everything you need. Follow it exactly and the files you produce will be accepted without editing.
+
+## What a ticket file is
+
+One markdown file. A YAML frontmatter block, then prose.
+
+```markdown
+---
+id: CORE-1
+title: Skirmish Setup
+status: todo
+priority: 2
+requires: []
+---
+
+# Skirmish Setup
+
+Prose, unparsed and unconstrained.
+```
+
+That example uses an illustrative key. Use the real ones named below, and do not include the example itself in what you hand back.
+
+| Field | What to write |
+|---|---|
+| `id` | `<KEY>-<NUM>`. See the keys and numbering sections below. |
+| `title` | Free text in title case. |
+| `status` | Always `todo` for a new ticket. |
+| `priority` | An integer from 0 through {{ maxPriority }}, where 0 is most urgent. Use {{ defaultPriority }} unless the work is clearly more or less urgent than the rest. |
+| `requires` | A list of ids this ticket depends on. Write `[]` when it depends on nothing. |
+
+Everything below the closing `---` is the body, and nothing parses it. That is where the real content goes.
+
+## Keys
+
+A key is the part of an id before the hyphen, and it groups related work. Keys are closed, which means a ticket carrying a key the repository has not registered is an error rather than a new group.
+
+{% if keys %}
+These keys are registered, and the number shown is the first one free under each.
+
+| Key | Covers | Start numbering at |
+|---|---|---|
+{% for key in keys %}
+| `{{ key.key }}` | {{ key.description }} | `{{ key.nextId }}` |
+{% endfor %}
+
+Prefer these keys. Reach for a new one only when some part of the work forms a category these plainly do not cover, and when you do, say in your output what it would group and why none of the registered keys fit. A ticket filed under a roughly right key is easy to move later, while a key is a structural decision the repository keeps. Proposing a key is not the same as having one, so a proposed key has to be registered by hand before your tickets are valid.
+
+Those starting numbers were read when this document was produced. If tickets have been created since, an id of yours may collide with one of them, which the repository reports as a duplicate id and a person resolves by renumbering. Nothing is lost.
+{% else %}
+No keys were available when this document was produced, either because the repository has none registered yet or because it was not reachable.
+
+So propose them. Choose a small set, three or four at most, each covering an obvious category of work in the project being described. `FEAT` for new features and `BUG` for defects are conventional starting points and are usually enough. Resist the urge to carve the project finely, because a key is a structural decision about the repository and too many of them is the common mistake. Each key is uppercase letters and digits, and must start with a letter.
+
+Give every key a one line description of what it covers, and number every key's tickets from 1.
+{% endif %}
+
+## Ids and filenames
+
+An id is the key, a hyphen, and a number with no leading zeros. Number each key's tickets in a single unbroken run, starting from the number given above, or from 1 for a key you are proposing. An id is permanent once written, so never reuse one within your output.
+
+Name each file `<ID>_<slug>.md`, where the slug is the title converted to camelCase with everything outside letters and digits removed.
+
+```
+CORE-1_skirmishSetup.md
+CORE-2_fixPathfindingOnDiagonals.md
+```
+
+Only the id prefix matters to the repository. A slug that reads well to a person is the whole of its job.
+
+## Titles are title case
+
+Write titles in title case, because the repository checks them and reports every title that does not match.
+
+A word carrying an uppercase letter past its first character, or a digit anywhere, is left exactly as written. That is what keeps `CLI`, `MCPServer`, and `2.x` intact, so spell an acronym in capitals when you mean one.
+
+## Dependencies point one way
+
+A ticket declares what it `requires`. It never declares what it blocks, because the reverse direction is derived and storing both guarantees they eventually disagree.
+
+Use real ids in `requires`, which you can do because you are allocating the ids yourself. Every id you name must be a ticket in your output or one that already exists in the repository. Dependencies may not form a cycle, so check that following `requires` from any ticket never arrives back at that same ticket.
+
+Order your output however reads best. A ticket may require one written after it.
+
+## Write the body for a reader who was not there
+
+This is the part that matters most, and the part you are actually here for.
+
+A ticket is read weeks later by someone, or something, with none of the context of the conversation that produced it. Put that context in the ticket. Include the architecture that was discussed, the assumptions being made, the alternatives that were considered and set aside, and the questions that were already asked and answered. State them plainly in the body where a new reader will see them.
+
+A ticket that only makes sense to whoever was in the conversation is a ticket that will be redone from scratch. A one line ticket is almost always a ticket that has lost something.
+
+Start the body with a level one heading matching the title, then write as much prose as the work deserves. Headings, lists, and code fences are all fine.
+
+## What to hand back
+
+For each ticket, write its filename on its own line, then the complete file in a fenced block:
+
+````
+CORE-1_skirmishSetup.md
+
+```markdown
+---
+id: CORE-1
+title: Skirmish Setup
+status: todo
+priority: 2
+requires: []
+---
+
+# Skirmish Setup
+
+The body, in full.
+```
+````
+
+Do not combine tickets into one file, do not summarize a ticket instead of writing it, and do not leave a body to be filled in later.
+
+If you are proposing keys rather than using registered ones, list them first, each with the exact command that registers it:
+
+```
+docket key add FEAT "Tickets that are for future features"
+```
+
+If your environment can package files for download, offering a zip of the same files as well is a convenience. The fenced blocks are what matters, because they can be read and corrected before anything is saved.
+
+## Then tell the person this
+
+End your output with the steps that turn it into real tickets, so nothing is left implied:
+
+1. Register any proposed keys by running the `docket key add` commands above, from the repository root.
+2. Save each file, under its given filename, into `{{ ticketDir }}/`.
+3. Run `docket validate` from the repository root.
+4. Resolve anything it reports as an error. Title case warnings are expected from hand written tickets and are cleared with `docket <ID> set --title "..."`.

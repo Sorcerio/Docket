@@ -10,14 +10,16 @@ No rules live here either. A handler decides what to say, never what is true.
 
 import argparse
 from pathlib import Path
+from typing import Optional
 
 from rich.table import Table
 from rich.text import Text
 
-from docket.cli.grammar import EXIT_INVALID, EXIT_OK, EXIT_USAGE, OUT_ARGUMENT, parseEditIdList, parseIdList, resolveGraphScope, resolveListFilters
+from docket.cli.grammar import EXIT_INVALID, EXIT_OK, EXIT_USAGE, OUTPUT_ARGUMENT, parseEditIdList, parseIdList, resolveGraphScope, resolveListFilters
 from docket.cli.output import STATUS_STYLES, Output, buildContextTable, relativeToRoot
 from docket.core.config import Config
 from docket.core.deploy import DeployReport, deploy, upgrade
+from docket.core.handoff import renderHandoff
 from docket.core.graph import Readiness, ResolvedGraph, dependencyContext, readyTickets, resolveGraph, subgraphForId, subgraphForKey, subgraphForStatus, ticketReadiness
 from docket.core.inputs import requireWritableFile, writeFile
 from docket.core.mermaid import renderGraph
@@ -342,17 +344,7 @@ def commandGraph(args: argparse.Namespace, store: Store, output: Output) -> int:
 
     source: str = renderGraph(graph)
 
-    if args.out is not None:
-        # Check the destination before rendering work is spent on it, and translate whatever the filesystem still refuses, so no write failure reaches the user as a traceback.
-        outPath: Path = writeFile(requireWritableFile(args.out, OUT_ARGUMENT), source, OUT_ARGUMENT)
-        output.print(f"Wrote {outPath}")
-
-        return EXIT_OK
-
-    # Straight to stdout with no styling, so a redirect captures exactly the mermaid source.
-    output.raw(source)
-
-    return EXIT_OK
+    return emitDocument(source, args.output, OUTPUT_ARGUMENT, output)
 
 
 def commandKey(args: argparse.Namespace, store: Store, output: Output) -> int:
@@ -427,6 +419,54 @@ def commandValidate(args: argparse.Namespace, store: Store, output: Output) -> i
 
     # Warnings alone must not fail a pre-commit hook, so only errors change the exit code.
     return EXIT_INVALID if report.errors else EXIT_OK
+
+
+def emitDocument(text: str, destination: Optional[str], name: str, output: Output) -> int:
+    """
+    Write rendered text to a file when one was named, and to stdout when one was not.
+
+    Both the mermaid source and the shipped documents are text a machine reads next, so both leave through here rather than each growing their own copy of the rule.
+
+    text: The rendered text to emit.
+    destination: The path to write to, or `None` to write to stdout.
+    name: What to name the destination in an error message, for example `--output path`.
+    output: Where to write.
+
+    Returns the process exit code.
+    """
+
+    if destination is not None:
+        # Check the destination before rendering work is spent on it, and translate whatever the filesystem still refuses, so no write failure reaches the user as a traceback.
+        outPath: Path = writeFile(requireWritableFile(destination, name), text, name)
+        output.print(f"Wrote {outPath}")
+
+        return EXIT_OK
+
+    # Straight to stdout with no styling, so a redirect captures exactly what was rendered and nothing else.
+    output.raw(text)
+
+    return EXIT_OK
+
+
+def commandDocs(args: argparse.Namespace, config: Optional[Config], output: Output) -> int:
+    """
+    Print a document docket ships, rendered for this repository.
+
+    args: The parsed arguments.
+    config: The configuration governing the current directory, or `None` when none was found.
+    output: Where to write.
+
+    Returns the process exit code.
+    """
+
+    if args.docsCommand != "handoff":
+        output.error("Expected one of: handoff.")
+        return EXIT_USAGE
+
+    # A configuration is what lets the brief name real keys and real numbering, but its absence is a state the document handles rather than an error, since a person may be anywhere when they go to fetch it.
+    store: Optional[Store] = Store(config) if config is not None else None
+
+    return emitDocument(renderHandoff(store), args.output, OUTPUT_ARGUMENT, output)
 
 
 def commandDeploy(args: argparse.Namespace, output: Output) -> int:

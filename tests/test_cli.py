@@ -472,10 +472,10 @@ def testGraphRefusesAnUnwritableOutPath(inRepo: Path, capsys: pytest.CaptureFixt
     main(["new", "CORE", "Skirmish Setup"])
     capsys.readouterr()
 
-    assert main(["graph", "--out", ""]) == EXIT_USAGE
+    assert main(["graph", "--output", ""]) == EXIT_USAGE
     assert "cannot be empty" in capsys.readouterr().err
 
-    assert main(["graph", "--out", str(inRepo)]) == EXIT_USAGE
+    assert main(["graph", "--output", str(inRepo)]) == EXIT_USAGE
     assert "is a directory" in capsys.readouterr().err
 
 
@@ -489,7 +489,7 @@ def testGraphWritesToANestedOutPath(inRepo: Path, capsys: pytest.CaptureFixture[
 
     target: Path = inRepo / "build" / "graphs" / "docket.mmd"
 
-    assert main(["graph", "--out", str(target)]) == EXIT_OK
+    assert main(["graph", "--output", str(target)]) == EXIT_OK
     assert "graph TD" in target.read_text(encoding="utf-8")
 
 
@@ -788,6 +788,76 @@ def testTheOldFlatCommandsAreGone(inRepo: Path, command: list[str]) -> None:
     assert excInfo.value.code == EXIT_USAGE
 
 
+def testDocsHandoffWritesTheBriefToStdout(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The brief is meant to be redirected to a file or pasted into another chat, so it bypasses `rich` exactly as mermaid source does.
+    """
+
+    assert main(["docs", "handoff"]) == EXIT_OK
+
+    out: str = capsys.readouterr().out
+
+    assert out.startswith("# Writing Tickets for Docket, Offsite\n")
+    assert "\x1b" not in out
+
+    # Rendered inside a repository, the brief names that repository's registry rather than teaching the reader to invent one.
+    assert "`CORE-1`" in out
+    assert "No keys were available" not in out
+
+
+def testDocsHandoffRendersOutsideARepository(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    A person fetching the brief may be anywhere, so a missing configuration is a branch of the document rather than a failure.
+    """
+
+    previous: str = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        assert main(["docs", "handoff"]) == EXIT_OK
+    finally:
+        os.chdir(previous)
+
+    assert "No keys were available" in capsys.readouterr().out
+
+
+def testDocsHandoffWritesToAnOutputPath(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The brief is carried somewhere else, so writing it straight to a file saves the redirect a person would otherwise have to type.
+    """
+
+    target: Path = inRepo / "handoff" / "brief.md"
+
+    assert main(["docs", "handoff", "--output", str(target)]) == EXIT_OK
+    assert "Wrote" in capsys.readouterr().out
+
+    # The file holds the document itself, rendered for this repository rather than the fallback.
+    written: str = target.read_text(encoding="utf-8")
+
+    assert written.startswith("# Writing Tickets for Docket, Offsite")
+    assert "`CORE-1`" in written
+
+
+def testDocsHandoffRefusesAnUnwritableOutputPath(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    A destination is checked the same way the graph destination is, since both leave through one emitter.
+    """
+
+    assert main(["docs", "handoff", "-o", ""]) == EXIT_USAGE
+    assert "cannot be empty" in capsys.readouterr().err
+
+    assert main(["docs", "handoff", "-o", str(inRepo)]) == EXIT_USAGE
+    assert "is a directory" in capsys.readouterr().err
+
+
+def testDocsRefusesAnUnknownSubcommand(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Naming the group alone is a usage error that says what the group accepts, matching how the key group answers the same mistake.
+    """
+
+    assert main(["docs"]) == EXIT_USAGE
+    assert "Expected one of: handoff." in capsys.readouterr().err
+
+
 def testGraphWritesBareMermaidToStdout(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """
     Machine-readable output bypasses `rich`, so a redirect captures exactly the source with no wrapping or escape sequences.
@@ -828,7 +898,7 @@ def testGraphWritesToAFile(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> 
 
     target: Path = inRepo / "out" / "graph.mmd"
 
-    assert main(["graph", "--out", str(target)]) == EXIT_OK
+    assert main(["graph", "--output", str(target)]) == EXIT_OK
     assert target.read_text(encoding="utf-8").startswith("graph TD\n")
 
 

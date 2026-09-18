@@ -10,7 +10,6 @@ The consumer receives ticket directories, a `CLAUDE.md`, a `.docket.toml`, one e
 
 import json
 from dataclasses import dataclass, field
-from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
@@ -18,8 +17,12 @@ from docket.core.atomic import writeTextAtomic
 from docket.core.config import CONFIG_FILENAME, Config, loadConfig
 from docket.core.errors import DeployError
 from docket.core.lock import LOCK_FILENAME
+from docket.core.resources import readPackageText
 
 # MARK: Constants
+
+# The directory inside the package holding the files a repository receives.
+TEMPLATES_DIRECTORY: str = "templates"
 
 # The template files shipped inside the package.
 TEMPLATE_CLAUDE: str = "CLAUDE.md"
@@ -164,7 +167,7 @@ def readTemplate(name: str) -> str:
     Returns the template text.
     """
 
-    return files("docket").joinpath("templates", name).read_text(encoding="utf-8")
+    return readPackageText(TEMPLATES_DIRECTORY, name)
 
 
 def _writeClaudeTemplate(config: Config, report: DeployReport) -> None:

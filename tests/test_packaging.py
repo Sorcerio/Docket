@@ -33,6 +33,7 @@ PACKAGE_DATA_FILES: tuple[str, ...] = (
     "py.typed",
     "templates/CLAUDE.md",
     "templates/docket.toml",
+    "docs/writingTicketsOffsite.md.jinja",
 )
 
 # Directories that must never reach the source distribution, because they are development state rather than source.

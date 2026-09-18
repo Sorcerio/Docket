@@ -49,7 +49,7 @@ def testWritableFileAcceptsANewPath(tmp_path: Path) -> None:
 
     target: Path = tmp_path / "nested" / "graph.mmd"
 
-    assert requireWritableFile(str(target), "--out path") == target
+    assert requireWritableFile(str(target), "--output path") == target
 
 
 def testWritableFileRefusesAnEmptyPath() -> None:
@@ -58,7 +58,7 @@ def testWritableFileRefusesAnEmptyPath() -> None:
     """
 
     with pytest.raises(EmptyValueError):
-        requireWritableFile("", "--out path")
+        requireWritableFile("", "--output path")
 
 
 def testWritableFileRefusesADirectory(tmp_path: Path) -> None:
@@ -67,7 +67,7 @@ def testWritableFileRefusesADirectory(tmp_path: Path) -> None:
     """
 
     with pytest.raises(OutputPathError) as raised:
-        requireWritableFile(str(tmp_path), "--out path")
+        requireWritableFile(str(tmp_path), "--output path")
 
     assert "is a directory" in str(raised.value)
 
@@ -79,7 +79,7 @@ def testWriteFileWritesTheTree(tmp_path: Path) -> None:
 
     target: Path = tmp_path / "nested" / "deeper" / "graph.mmd"
 
-    assert writeFile(target, "graph TD\n", "--out path") == target
+    assert writeFile(target, "graph TD\n", "--output path") == target
     assert target.read_text(encoding="utf-8") == "graph TD\n"
 
 
@@ -93,4 +93,4 @@ def testWriteFileTranslatesARefusal(tmp_path: Path) -> None:
     blocker.write_text("not a directory", encoding="utf-8")
 
     with pytest.raises(OutputPathError):
-        writeFile(blocker / "graph.mmd", "graph TD\n", "--out path")
+        writeFile(blocker / "graph.mmd", "graph TD\n", "--output path")

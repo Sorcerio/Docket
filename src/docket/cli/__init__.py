@@ -14,6 +14,7 @@ from typing import Optional
 
 from docket.cli.commands import (
     commandDeploy,
+    commandDocs,
     commandGraph,
     commandKey,
     commandList,
@@ -25,13 +26,14 @@ from docket.cli.commands import (
     commandStatusRead,
     commandTicket,
     commandValidate,
+    emitDocument,
 )
 from docket.cli.grammar import (
     CLEAR_SENTINEL,
     EXIT_INVALID,
     EXIT_OK,
     EXIT_USAGE,
-    OUT_ARGUMENT,
+    OUTPUT_ARGUMENT,
     PROGRAM_NAME,
     TICKET_COMMAND,
     TOKEN_ID,
@@ -62,7 +64,7 @@ __all__: list[str] = [
     "EXIT_INVALID",
     "EXIT_OK",
     "EXIT_USAGE",
-    "OUT_ARGUMENT",
+    "OUTPUT_ARGUMENT",
     "PROGRAM_NAME",
     "STATUS_STYLES",
     "TICKET_COMMAND",
@@ -75,6 +77,7 @@ __all__: list[str] = [
     "buildParser",
     "classifyToken",
     "commandDeploy",
+    "commandDocs",
     "commandGraph",
     "commandKey",
     "commandList",
@@ -89,6 +92,7 @@ __all__: list[str] = [
     "describeKeys",
     "describePriorities",
     "dispatch",
+    "emitDocument",
     "main",
     "parseEditIdList",
     "parseIdList",
@@ -149,6 +153,10 @@ def dispatch(args: argparse.Namespace, config: Optional[Config], output: Output)
     # Deploy and upgrade run before a configuration exists, or in order to repair one, so they must not require discovering it first.
     if args.command in ("deploy", "upgrade"):
         return commandDeploy(args, output)
+
+    # A shipped document renders with or without a configuration, so it must not be gated behind discovering one either.
+    if args.command == "docs":
+        return commandDocs(args, config, output)
 
     # Every other command works against the configuration governing the current directory. Discovery is repeated when the parser was built without one, so the reason it could not be found is reported by the code that knows it.
     store: Store = Store(config if config is not None else discoverConfig())
