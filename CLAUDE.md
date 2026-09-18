@@ -5,6 +5,19 @@
 The `CLAUDE.md` file in `src\docket\templates\CLAUDE.md` is *not* for you.
 It is a template provided when Docket is deployed.
 
+## General
+
+- We use American English here.
+- We *are not* lazy developers. We implement things the *right* way based on informed and reasoned hypotheses. If something is beyond the explicit scope of a ticket but it is the correct answer, then it is the proper course of action.
+- We keep our code DRY and lean. If something is reused, it should be shared; not duplicated into multiple places.
+
+## Environment
+
+This project is managed by `uv`.
+
+- Always run Python through `uv`, as in `uv run python ...` and `uv run pytest`. Never call a bare `python`, `pip`, or the `.venv` interpreter directly.
+- Add and remove dependencies with `uv add` and `uv remove`, never by editing `pyproject.toml` by hand.
+
 ## Code Style
 
 Match existing style exactly:
@@ -51,4 +64,4 @@ Keep the snake_case-to-camelCase mapping explicit in `server.py`. Neither conven
 - Short subject line expressing what was done as a short imperative.
 - Subject line only. No body, no additional text.
 - Never commit unprompted. Verify (compile and test), report ready for review, then wait for review.
-- When presenting code for review, use the `commit-message` skill to draft the commit subject alongside it.
+- When presenting code for review (ie: when you stop at Phases or Checkpoints), stage the code you believe should be merged at this review stage and use the `commit-message` skill (or fall back to repo style if the command does not exist) to draft the commit subject alongside it.
