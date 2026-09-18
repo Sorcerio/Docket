@@ -101,6 +101,7 @@ docket list [-s todo] [-k CORE] [-m 2] [-r]
 docket graph [-i CORE-14 | -k GEN | -s todo] [-o FILE]
 docket key list | add KEY "desc" [-r TEXT] | remove KEY
 docket validate | deploy PATH | upgrade PATH
+docket docs handoff
 ```
 
 `-r` replaces the dependency list. `-ra` and `-rr` edit the one already there. Both in one call is refused.
@@ -126,6 +127,18 @@ Every short flag has a long form (`-k/--key`, `-p/--priority`, `-m/--priority-ma
 | `add_key(key, description, rationale)` | After the agent has asked the user. |
 | `validate()` | Structured findings. |
 | `set_metadata(id, key, value?)` | One entry at a time, leaving every other key alone. |
+
+## Writing Tickets Elsewhere
+
+```bash
+docket docs handoff > brief.md
+```
+
+Prints a brief written for a chat system that has no access to your repository. Paste it in, describe the project, and it writes ticket files by hand.
+
+The brief is rendered against this repository, so it names your registered keys, the first free number under each, your priority band, and the directory the files belong in. Nothing is left for it to guess.
+
+Save what comes back into your todo directory and run `docket validate`. That is the whole import step, because every rule an importer would need already lives there. Tickets written somewhere else are checked by the same code as the ones written here.
 
 ## Key Ticket Rules
 

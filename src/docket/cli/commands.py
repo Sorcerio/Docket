@@ -10,6 +10,7 @@ No rules live here either. A handler decides what to say, never what is true.
 
 import argparse
 from pathlib import Path
+from typing import Optional
 
 from rich.table import Table
 from rich.text import Text
@@ -18,6 +19,7 @@ from docket.cli.grammar import EXIT_INVALID, EXIT_OK, EXIT_USAGE, OUT_ARGUMENT, 
 from docket.cli.output import STATUS_STYLES, Output, buildContextTable, relativeToRoot
 from docket.core.config import Config
 from docket.core.deploy import DeployReport, deploy, upgrade
+from docket.core.handoff import renderHandoff
 from docket.core.graph import Readiness, ResolvedGraph, dependencyContext, readyTickets, resolveGraph, subgraphForId, subgraphForKey, subgraphForStatus, ticketReadiness
 from docket.core.inputs import requireWritableFile, writeFile
 from docket.core.mermaid import renderGraph
@@ -427,6 +429,30 @@ def commandValidate(args: argparse.Namespace, store: Store, output: Output) -> i
 
     # Warnings alone must not fail a pre-commit hook, so only errors change the exit code.
     return EXIT_INVALID if report.errors else EXIT_OK
+
+
+def commandDocs(args: argparse.Namespace, config: Optional[Config], output: Output) -> int:
+    """
+    Print a document docket ships, rendered for this repository.
+
+    args: The parsed arguments.
+    config: The configuration governing the current directory, or `None` when none was found.
+    output: Where to write.
+
+    Returns the process exit code.
+    """
+
+    if args.docsCommand != "handoff":
+        output.error("Expected one of: handoff.")
+        return EXIT_USAGE
+
+    # A configuration is what lets the brief name real keys and real numbering, but its absence is a state the document handles rather than an error, since a person may be anywhere when they go to fetch it.
+    store: Optional[Store] = Store(config) if config is not None else None
+
+    # Straight to stdout with no styling, so redirecting this to a file or a clipboard yields exactly the document.
+    output.raw(renderHandoff(store))
+
+    return EXIT_OK
 
 
 def commandDeploy(args: argparse.Namespace, output: Output) -> int:

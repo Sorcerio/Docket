@@ -67,15 +67,16 @@ So the primary instruction is one fenced block per ticket with its filename on t
 - Title case warnings are acceptable output and the document says how to clear them, through `update_ticket` or by the on-site agent.
 - The document never tells the reader to call a tool, and never assumes it can see a repository.
 
-## Open decisions
+## Decisions taken
 
-- Where it lives under `docs/`, and its filename. It has to read as "prepare tickets for a Docket instance that is not here", not as "start a project with Docket".
-- Whether `deploy` ships it into consumer repositories alongside `docs/tickets/CLAUDE.md`, or whether it stays in this repository as something the user links to.
-- Whether a CLI escape hatch prints it to stdout, so an installed user can pipe it to the clipboard without going to find the file. Cheap, and it is the difference between the feature being used and being forgotten.
-- How much of `docs/tickets/CLAUDE.md` is duplicated versus restated. Duplication drifts, and the two documents disagree on purpose, so a shared source is probably not worth it.
+- The brief lives at `src/docket/docs/writingTicketsOffsite.md.jinja`, inside the package so the CLI can print it, and deliberately not under `templates/`, which stays reserved for `FEAT-6`.
+- `deploy` does not ship it into consumer repositories. A document whose rules invert the ones beside the tickets should not sit beside the tickets.
+- `docket docs handoff` prints it, through `output.raw` so a redirect receives exactly the document.
+- It is a rendered template rather than a flat file, which retired the constraint this ticket originally proposed. Rather than restricting the reader to new keys, the brief now names the registered keys, what each covers, and the first free number under each. Collision stops being a rule the reader has to follow and becomes a fact it is handed, so appending to an existing key is the ordinary path and proposing a new one is the exception it argues for.
+- Nothing is shared with `docs/tickets/CLAUDE.md`. The two disagree on purpose, so a shared source would have to encode the disagreement.
 
 ## Notes
 
-Documentation only, with no change to `docket.core`, unless the CLI escape hatch is taken.
+Not documentation only in the end. Rendering the brief against the repository needed `docket.core.handoff`, and sharing the package data reader with `deploy` needed `docket.core.resources`.
 
 The residual cost against every alternative is that hand-written frontmatter skips the title casing `create_ticket` performs, so the first `validate` after a handoff usually reports title case warnings to clear. That is self-healing and cheaper than either rejected design.

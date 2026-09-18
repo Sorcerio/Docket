@@ -788,6 +788,47 @@ def testTheOldFlatCommandsAreGone(inRepo: Path, command: list[str]) -> None:
     assert excInfo.value.code == EXIT_USAGE
 
 
+def testDocsHandoffWritesTheBriefToStdout(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The brief is meant to be redirected to a file or pasted into another chat, so it bypasses `rich` exactly as mermaid source does.
+    """
+
+    assert main(["docs", "handoff"]) == EXIT_OK
+
+    out: str = capsys.readouterr().out
+
+    assert out.startswith("# Writing Tickets for Docket, Offsite\n")
+    assert "\x1b" not in out
+
+    # Rendered inside a repository, the brief names that repository's registry rather than teaching the reader to invent one.
+    assert "`CORE-1`" in out
+    assert "No keys were available" not in out
+
+
+def testDocsHandoffRendersOutsideARepository(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    A person fetching the brief may be anywhere, so a missing configuration is a branch of the document rather than a failure.
+    """
+
+    previous: str = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        assert main(["docs", "handoff"]) == EXIT_OK
+    finally:
+        os.chdir(previous)
+
+    assert "No keys were available" in capsys.readouterr().out
+
+
+def testDocsRefusesAnUnknownSubcommand(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Naming the group alone is a usage error that says what the group accepts, matching how the key group answers the same mistake.
+    """
+
+    assert main(["docs"]) == EXIT_USAGE
+    assert "Expected one of: handoff." in capsys.readouterr().err
+
+
 def testGraphWritesBareMermaidToStdout(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """
     Machine-readable output bypasses `rich`, so a redirect captures exactly the source with no wrapping or escape sequences.

@@ -280,6 +280,12 @@ def buildParser(config: Optional[Config] = None) -> argparse.ArgumentParser:
     keyRemoveParser: argparse.ArgumentParser = keyCommands.add_parser("remove", help="Remove a key no ticket uses.", formatter_class=RichHelpFormatter)
     keyRemoveParser.add_argument("key", help=f"The key to remove. {keyOptions}")
 
+    # Documents docket ships, rendered against this repository. This is a group rather than a bare command because what it prints is read somewhere else, and more than one such document is plausible.
+    docsParser: argparse.ArgumentParser = commands.add_parser("docs", help="Print a document docket ships, rendered for this repository.", formatter_class=RichHelpFormatter)
+    docsCommands = docsParser.add_subparsers(dest="docsCommand", metavar="SUBCOMMAND")
+
+    docsCommands.add_parser("handoff", help="Print the brief that teaches a chat system with no access to this repository how to write tickets for it by hand.", formatter_class=RichHelpFormatter)
+
     commands.add_parser("validate", help="Run every integrity rule.", formatter_class=RichHelpFormatter)
 
     deployParser: argparse.ArgumentParser = commands.add_parser("deploy", help="Install docket into a repository.", formatter_class=RichHelpFormatter)
