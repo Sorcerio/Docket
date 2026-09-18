@@ -1,7 +1,7 @@
 ---
 id: FEAT-18
 title: Offsite Ticket Authoring Brief
-status: todo
+status: done
 priority: 1
 requires: []
 metadata: {}
