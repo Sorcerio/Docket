@@ -12,6 +12,10 @@ doneDir = "done"
 defaultPriority = 2
 maxPriority = 4
 
+# How many nodes `docket docs roadmap` aims to draw. Past this it drops the completed tickets furthest from the work still open.
+# Set it to 0 for no ceiling, and remember that mermaid stops being readable well before a thousand nodes.
+maxRoadmapNodes = 200
+
 # How long, in seconds, one docket process waits for another to finish writing before giving up.
 # Writes are serialized across processes, so a CLI command and a running MCP server never overwrite each other.
 lockTimeout = 5.0

@@ -1,14 +1,16 @@
 """
 Graph Tests
 
-Cover reverse edge derivation, scoped traversal, dependency context, readiness, and cycle detection.
+Cover reverse edge derivation, scoped traversal, culling, dependency context, readiness, and cycle detection.
 """
 
 # MARK: Imports
 
+from typing import Optional
+
 import pytest
 
-from docket.core.graph import Edge, Readiness, ResolvedGraph, dependencyContext, findCycles, readyTickets, resolveGraph, subgraphForId, subgraphForKey, subgraphForStatus, ticketReadiness
+from docket.core.graph import CulledGraph, Edge, Readiness, ResolvedGraph, cullGraph, dependencyContext, findCycles, readyTickets, resolveGraph, scopeGraph, subgraphForId, subgraphForKey, subgraphForStatus, ticketReadiness
 from docket.core.store import TicketSet
 from docket.core.ticket import Ticket
 
@@ -421,3 +423,168 @@ def testTraversalSurvivesACycle() -> None:
     scoped: ResolvedGraph = subgraphForId(graph, "CORE-3")
 
     assert sorted(scoped.nodes) == ["CORE-1", "CORE-2", "CORE-3"]
+
+
+def testScopeGraphReturnsTheWholeGraphWhenNothingScopesIt() -> None:
+    """
+    Both commands that draw a graph share one scoping switch, so the unscoped case has to be the identity rather than an empty result.
+    """
+
+    graph: ResolvedGraph = resolveGraph(buildSet(("CORE-1", []), ("GEN-1", ["CORE-1"])))
+
+    assert scopeGraph(graph) is graph
+
+
+@pytest.mark.parametrize(
+    ("ticketId", "key", "status", "expected"),
+    [
+        ("CORE-1", None, None, ["CORE-1", "GEN-1"]),
+        (None, "GEN", None, ["CORE-1", "GEN-1"]),
+        (None, None, "todo", ["CORE-1", "GEN-1"]),
+        (None, None, "done", ["HEAD-1"]),
+    ],
+)
+def testScopeGraphAppliesWhicheverScopeWasNamed(ticketId: Optional[str], key: Optional[str], status: Optional[str], expected: list[str]) -> None:
+    """
+    The three scopes reach the same three traversals through the switch that the callers used to each write out for themselves.
+
+    ticketId: The id scope under test, or `None`.
+    key: The key scope under test, or `None`.
+    status: The status scope under test, or `None`.
+    expected: The ids the scope should keep.
+    """
+
+    graph: ResolvedGraph = resolveGraph(buildStatusSet(("CORE-1", "todo", []), ("GEN-1", "todo", ["CORE-1"]), ("HEAD-1", "done", [])))
+
+    assert sorted(scopeGraph(graph, ticketId, key, status).nodes) == expected
+
+
+def testCullingIsSkippedWithoutACeiling() -> None:
+    """
+    Zero is the documented way to ask for no ceiling, so the graph has to come back untouched rather than emptied.
+    """
+
+    graph: ResolvedGraph = resolveGraph(buildSet(("CORE-1", []), ("CORE-2", ["CORE-1"])))
+
+    culled: CulledGraph = cullGraph(graph, 0)
+
+    assert culled.graph is graph
+    assert culled.dropped == 0
+
+
+def testCullingIsSkippedWhenTheGraphAlreadyFits() -> None:
+    """
+    A graph under the ceiling is not narrowed, so a repository small enough never pays for the feature at all.
+    """
+
+    graph: ResolvedGraph = resolveGraph(buildSet(("CORE-1", []), ("CORE-2", ["CORE-1"])))
+
+    culled: CulledGraph = cullGraph(graph, 2)
+
+    assert culled.graph is graph
+    assert culled.dropped == 0
+
+
+def testCullingDropsTheFinishedWorkFurthestFromOpenWork() -> None:
+    """
+    The finished tickets are admitted ring by ring outward from the open ones, so the history nothing open still reaches is what goes first.
+    """
+
+    # A chain of finished work behind one open ticket, which makes distance the only thing telling the finished tickets apart.
+    graph: ResolvedGraph = resolveGraph(
+        buildStatusSet(
+            ("CORE-1", "done", []),
+            ("CORE-2", "done", ["CORE-1"]),
+            ("CORE-3", "done", ["CORE-2"]),
+            ("CORE-4", "todo", ["CORE-3"]),
+        )
+    )
+
+    culled: CulledGraph = cullGraph(graph, 3)
+
+    assert sorted(culled.graph.nodes) == ["CORE-2", "CORE-3", "CORE-4"]
+    assert culled.dropped == 1
+
+
+def testCullingDropsFinishedWorkNothingOpenReaches() -> None:
+    """
+    A finished ticket disconnected from everything still open is never reached by the walk, so it goes however much room is left.
+    """
+
+    graph: ResolvedGraph = resolveGraph(
+        buildStatusSet(
+            ("CORE-1", "done", []),
+            ("CORE-2", "todo", ["CORE-1"]),
+            ("GEN-1", "done", []),
+            ("GEN-2", "done", ["GEN-1"]),
+        )
+    )
+
+    culled: CulledGraph = cullGraph(graph, 2)
+
+    assert sorted(culled.graph.nodes) == ["CORE-1", "CORE-2"]
+    assert culled.dropped == 2
+
+
+def testCullingNeverDropsOpenWork() -> None:
+    """
+    The ceiling is a target rather than a cap, because a roadmap that hides a live ticket is worse than one that renders slowly.
+    """
+
+    graph: ResolvedGraph = resolveGraph(buildStatusSet(*[(f"CORE-{number}", "todo", []) for number in range(1, 6)], ("GEN-1", "done", [])))
+
+    culled: CulledGraph = cullGraph(graph, 2)
+
+    assert sorted(culled.graph.nodes) == ["CORE-1", "CORE-2", "CORE-3", "CORE-4", "CORE-5"]
+
+    # Only the finished ticket could be given up, and giving it up still leaves the graph over the ceiling.
+    assert culled.dropped == 1
+
+
+def testCullingFillsAnOverflowingRingByIdOrder() -> None:
+    """
+    Every member of one ring sits at the same distance, so the tie is broken by id to keep a committed document from churning between runs.
+    """
+
+    graph: ResolvedGraph = resolveGraph(
+        buildStatusSet(
+            ("CORE-10", "done", []),
+            ("CORE-2", "done", []),
+            ("CORE-3", "done", []),
+            ("CORE-4", "todo", ["CORE-2", "CORE-3", "CORE-10"]),
+        )
+    )
+
+    culled: CulledGraph = cullGraph(graph, 3)
+
+    # `CORE-2` and `CORE-3` are the first two numerically, which is what orders them rather than the order they were written in.
+    assert sorted(culled.graph.nodes) == ["CORE-2", "CORE-3", "CORE-4"]
+    assert culled.dropped == 1
+
+
+def testCullingNarrowsEdgesToWhatSurvived() -> None:
+    """
+    An edge whose other end was dropped cannot be drawn, so the restriction the scopes already perform is what the cull reuses.
+    """
+
+    graph: ResolvedGraph = resolveGraph(
+        buildStatusSet(
+            ("CORE-1", "done", []),
+            ("CORE-2", "done", ["CORE-1"]),
+            ("CORE-3", "todo", ["CORE-2"]),
+        )
+    )
+
+    culled: CulledGraph = cullGraph(graph, 2)
+
+    assert culled.graph.edges == [Edge(fromId="CORE-2", toId="CORE-3")]
+
+
+def testCullingKeepsTheScope() -> None:
+    """
+    Narrowing a graph does not change what it was scoped to, and the renderer titles the document from that scope.
+    """
+
+    graph: ResolvedGraph = subgraphForKey(resolveGraph(buildStatusSet(("CORE-1", "done", []), ("CORE-2", "todo", ["CORE-1"]))), "CORE")
+
+    assert cullGraph(graph, 1).graph.scope == "CORE"

@@ -1,0 +1,22 @@
+# {{ title }}
+
+> Generated with `docket docs roadmap`.
+
+```mermaid
+{{ mermaid }}```
+
+## Legend
+
+| Shape | Status |
+|---|---|
+| `[ ]` | todo, not started |
+| `{ }` | wip, in flight |
+| `( )` | done |
+
+Arrows indicate required order of operations.
+
+Each node's border represents its priority. Heaviest is higher priority.
+{% if hasExternal %}
+
+A dashed border indicates a ticket from outside this roadmap's scope that is shown because something inside the scope depends on it or is depended on by it.
+{% endif %}

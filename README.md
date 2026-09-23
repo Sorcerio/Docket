@@ -101,8 +101,13 @@ docket list [-s todo] [-k CORE] [-m 2] [-r]
 docket graph [-i CORE-14 | -k GEN | -s todo] [-o FILE]
 docket key list | add KEY "desc" [-r TEXT] | remove KEY
 docket validate | deploy PATH | upgrade PATH
-docket docs handoff [-o FILE]
+docket docs handoff [-p] [-o FILE]
+docket docs roadmap [CORE-14 | GEN | todo] [-m N] [-p] [-o FILE]
 ```
+
+`docs` writes a file: `handoff.md` and `roadmap.md` at the repo root. `-p/--print` sends it to stdout instead, `-o` picks another path, and passing both writes the file and prints it. `graph` is the exception, printing unless you ask for a file, because its output is usually piped.
+
+`docket docs roadmap` is the committable picture of the graph: a markdown file wrapping a mermaid diagram, plus the legend a renderer that ignores styling would otherwise leave you without. Past `maxRoadmapNodes` it drops the completed tickets furthest from the work still open, and never drops an open ticket, so the diagram stays readable without losing what is ahead.
 
 `-r` replaces the dependency list. `-ra` and `-rr` edit the one already there. Both in one call is refused.
 
@@ -157,6 +162,7 @@ doneDir = "done"
 defaultPriority = 2
 maxPriority = 4
 lockTimeout = 5.0
+maxRoadmapNodes = 200
 
 [keys]
 # Primary arch
@@ -166,6 +172,8 @@ META = "campaign and progression"
 ```
 
 A key's rationale becomes the comment above it, and removing the key takes the comment with it. The status vocabulary is deliberately not configurable.
+
+`maxRoadmapNodes` is how many nodes `docket docs roadmap` aims to draw, and `0` turns the ceiling off.
 
 `docket deploy` never rewrites an existing `.docket.toml`. Run `docket upgrade .` later to refresh the template and repair the server entry without touching your config or tickets.
 

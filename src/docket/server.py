@@ -32,7 +32,7 @@ from mcp.server import MCPServer
 
 from docket import __version__
 from docket.core.config import Config, discoverConfig
-from docket.core.graph import Readiness, ResolvedGraph, dependencyContext, resolveGraph, subgraphForId, subgraphForKey, subgraphForStatus, ticketReadiness
+from docket.core.graph import Readiness, ResolvedGraph, dependencyContext, resolveGraph, scopeGraph, ticketReadiness
 from docket.core.mermaid import renderGraph
 from docket.core.store import Store, TicketResult, TicketSet
 from docket.core.ticket import Ticket, requireKnownStatus
@@ -235,16 +235,9 @@ async def graphTool(id: Optional[str] = None, key: Optional[str] = None, status:
     """
 
     store: Store = _store()
-    graph: ResolvedGraph = resolveGraph(store.loadAll())
 
-    # Scope when asked, narrowest request first.
-    if id is not None:
-        graph = subgraphForId(graph, id)
-    elif key is not None:
-        graph = subgraphForKey(graph, key)
-    elif status is not None:
-        # The CLI has `choices` to reject a status nobody uses, and without the same check here an unreadable one would render an empty graph that reads as an answer.
-        graph = subgraphForStatus(graph, requireKnownStatus(status))
+    # The CLI has `choices` to reject a status nobody uses, and without the same check here an unreadable one would render an empty graph that reads as an answer.
+    graph: ResolvedGraph = scopeGraph(resolveGraph(store.loadAll()), id, key, None if status is None else requireKnownStatus(status))
 
     return _json({"scope": graph.scope, "nodeCount": len(graph), "mermaid": renderGraph(graph)})
 

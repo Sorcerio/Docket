@@ -17,12 +17,13 @@ from rich.text import Text
 
 from docket.cli.grammar import EXIT_INVALID, EXIT_OK, EXIT_USAGE, OUTPUT_ARGUMENT, parseEditIdList, parseIdList, resolveGraphScope, resolveListFilters
 from docket.cli.output import STATUS_STYLES, Output, buildContextTable, relativeToRoot
-from docket.core.config import Config
+from docket.core.config import Config, discoverConfig
 from docket.core.deploy import DeployReport, deploy, upgrade
-from docket.core.handoff import renderHandoff
-from docket.core.graph import Readiness, ResolvedGraph, dependencyContext, readyTickets, resolveGraph, subgraphForId, subgraphForKey, subgraphForStatus, ticketReadiness
+from docket.core.handoff import HANDOFF_FILENAME, renderHandoff
+from docket.core.graph import Readiness, ResolvedGraph, dependencyContext, readyTickets, resolveGraph, scopeGraph, ticketReadiness
 from docket.core.inputs import requireWritableFile, writeFile
 from docket.core.mermaid import renderGraph
+from docket.core.roadmap import ROADMAP_FILENAME, Roadmap, buildRoadmap
 from docket.core.store import Store, TicketResult, TicketSet
 from docket.core.ticket import STATUSES, Ticket
 from docket.core.validate import SEVERITY_ERROR, ValidationReport, validate
@@ -329,18 +330,9 @@ def commandGraph(args: argparse.Namespace, store: Store, output: Output) -> int:
 
     ticketId, key, status = resolveGraphScope(args.scope, args.id, args.key, args.status)
 
-    graph: ResolvedGraph = resolveGraph(store.loadAll())
+    requireScopeKey(store, key)
 
-    # Scope the graph when asked. At most one of the three survives resolution.
-    if ticketId is not None:
-        graph = subgraphForId(graph, ticketId)
-    elif key is not None:
-        # For the same reason as `list`, an unregistered key here would render an empty graph rather than admitting the key does not exist.
-        store.config.requireKnownKey(key)
-        graph = subgraphForKey(graph, key)
-    elif status is not None:
-        # No equivalent check, because the vocabulary is fixed and both spellings are checked against it before they arrive. An empty result here is a true answer rather than a typo.
-        graph = subgraphForStatus(graph, status)
+    graph: ResolvedGraph = scopeGraph(resolveGraph(store.loadAll()), ticketId, key, status)
 
     source: str = renderGraph(graph)
 
@@ -421,36 +413,75 @@ def commandValidate(args: argparse.Namespace, store: Store, output: Output) -> i
     return EXIT_INVALID if report.errors else EXIT_OK
 
 
-def emitDocument(text: str, destination: Optional[str], name: str, output: Output) -> int:
+def requireScopeKey(store: Store, key: Optional[str]) -> None:
     """
-    Write rendered text to a file when one was named, and to stdout when one was not.
+    Refuse a scope naming a key the repository has not registered.
 
-    Both the mermaid source and the shipped documents are text a machine reads next, so both leave through here rather than each growing their own copy of the rule.
+    Scoping to an unknown key would draw an empty graph, which reads as an answer rather than as the typo it is. `list` refuses one for the same reason. A status needs no equivalent check, since the vocabulary is fixed and both spellings are checked against it before they arrive here, so an empty result there is a true answer.
+
+    store: The store holding the registry.
+    key: The key the scope named, or `None` when it named something else.
+    """
+
+    if key is not None:
+        store.config.requireKnownKey(key)
+
+
+def documentPath(config: Optional[Config], filename: str) -> Path:
+    """
+    Place a shipped document's prescribed destination.
+
+    A document belongs to the repository it describes, so it lands beside the configuration that governs it. Run outside a repository there is no such place, and the working directory is the only honest fallback, which is the same reasoning that lets the brief render without a configuration at all.
+
+    config: The configuration governing the document, or `None` when none was found.
+    filename: What the document is called.
+
+    Returns the path to write to unless the caller names another.
+    """
+
+    return (config.repoRoot if config is not None else Path.cwd()) / filename
+
+
+def emitDocument(text: str, destination: Optional[str], name: str, output: Output, defaultPath: Optional[Path] = None, toPrint: bool = False, note: str = "") -> int:
+    """
+    Send rendered text to the file it belongs in, to stdout, or to both.
+
+    Every command that renders text leaves through here rather than each growing its own copy of the rule. What differs between them is only whether they have a file to fall back on: a document does and so writes one unasked, while `graph` does not and so stays a pipe.
+
+    A named destination always wins. Without one, the prescribed path is written unless printing was asked for instead, and asking for both does both.
 
     text: The rendered text to emit.
-    destination: The path to write to, or `None` to write to stdout.
+    destination: The path the caller named, or `None` when none was named.
     name: What to name the destination in an error message, for example `--output path`.
     output: Where to write.
+    defaultPath: The path to write when none was named, or `None` to leave stdout as the only destination.
+    toPrint: Whether to print the text to stdout.
+    note: Anything to append to the confirmation line, already spaced and parenthesized.
 
     Returns the process exit code.
     """
 
-    if destination is not None:
-        # Check the destination before rendering work is spent on it, and translate whatever the filesystem still refuses, so no write failure reaches the user as a traceback.
-        outPath: Path = writeFile(requireWritableFile(destination, name), text, name)
-        output.print(f"Wrote {outPath}")
+    chosen: Optional[str] = destination
 
-        return EXIT_OK
+    # Fall back to the prescribed path, which printing replaces rather than adds to, so a bare print stays clean enough to pipe.
+    if chosen is None and defaultPath is not None and not toPrint:
+        chosen = str(defaultPath)
 
-    # Straight to stdout with no styling, so a redirect captures exactly what was rendered and nothing else.
-    output.raw(text)
+    if chosen is not None:
+        # Check the destination before the filesystem is touched, and translate whatever it still refuses, so no write failure reaches the user as a traceback.
+        outPath: Path = writeFile(requireWritableFile(chosen, name), text, name)
+        output.print(f"Wrote {outPath}{note}")
+
+    # Straight to stdout with no styling, so a redirect captures exactly what was rendered and nothing else. With nothing written this is the whole of the command's output.
+    if toPrint or chosen is None:
+        output.raw(text)
 
     return EXIT_OK
 
 
 def commandDocs(args: argparse.Namespace, config: Optional[Config], output: Output) -> int:
     """
-    Print a document docket ships, rendered for this repository.
+    Write a document docket ships, rendered for this repository.
 
     args: The parsed arguments.
     config: The configuration governing the current directory, or `None` when none was found.
@@ -459,14 +490,45 @@ def commandDocs(args: argparse.Namespace, config: Optional[Config], output: Outp
     Returns the process exit code.
     """
 
-    if args.docsCommand != "handoff":
-        output.error("Expected one of: handoff.")
-        return EXIT_USAGE
+    if args.docsCommand == "handoff":
+        # A configuration is what lets the brief name real keys and real numbering, but its absence is a state the document handles rather than an error, since a person may be anywhere when they go to fetch it.
+        store: Optional[Store] = Store(config) if config is not None else None
 
-    # A configuration is what lets the brief name real keys and real numbering, but its absence is a state the document handles rather than an error, since a person may be anywhere when they go to fetch it.
-    store: Optional[Store] = Store(config) if config is not None else None
+        return emitDocument(renderHandoff(store), args.output, OUTPUT_ARGUMENT, output, documentPath(config, HANDOFF_FILENAME), args.toPrint)
 
-    return emitDocument(renderHandoff(store), args.output, OUTPUT_ARGUMENT, output)
+    if args.docsCommand == "roadmap":
+        # The roadmap is nothing but this repository's own tickets, so unlike the brief it cannot be rendered without one. Discovery is repeated here so the reason a configuration could not be found is reported by the code that knows it.
+        return commandRoadmap(args, Store(config if config is not None else discoverConfig()), output)
+
+    output.error("Expected one of: handoff, roadmap.")
+
+    return EXIT_USAGE
+
+
+def commandRoadmap(args: argparse.Namespace, store: Store, output: Output) -> int:
+    """
+    Write the dependency graph as a markdown document with an embedded mermaid diagram.
+
+    args: The parsed arguments.
+    store: The store to read from.
+    output: Where to write.
+
+    Returns the process exit code.
+    """
+
+    ticketId, key, status = resolveGraphScope(args.scope, args.id, args.key, args.status)
+
+    requireScopeKey(store, key)
+
+    # The flag overrides the configured ceiling for one run, which is what lets a repository render a bigger diagram once without editing its configuration.
+    maxNodes: int = store.config.maxRoadmapNodes if args.maxNodes is None else args.maxNodes
+
+    roadmap: Roadmap = buildRoadmap(store, ticketId=ticketId, key=key, status=status, maxNodes=maxNodes)
+
+    # The document says nothing about what the ceiling dropped, so the person who ran the command is told here instead. Otherwise a diagram that quietly stopped showing its history gives no hint of why.
+    note: str = f" ({roadmap.dropped} completed ticket(s) omitted)" if roadmap.dropped else ""
+
+    return emitDocument(roadmap.document, args.output, OUTPUT_ARGUMENT, output, documentPath(store.config, ROADMAP_FILENAME), args.toPrint, note)
 
 
 def commandDeploy(args: argparse.Namespace, output: Output) -> int:

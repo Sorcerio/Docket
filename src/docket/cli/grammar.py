@@ -16,7 +16,9 @@ from rich_argparse import RichHelpFormatter
 from docket import __version__
 from docket.core.config import Config, discoverConfig
 from docket.core.errors import ConflictingArgumentsError, DocketError, InvalidArgumentError, InvalidIdError
+from docket.core.handoff import HANDOFF_FILENAME
 from docket.core.ids import isValidId, isValidKey
+from docket.core.roadmap import ROADMAP_FILENAME
 from docket.core.ticket import STATUSES
 
 # MARK: Constants
@@ -260,11 +262,7 @@ def buildParser(config: Optional[Config] = None) -> argparse.ArgumentParser:
     listParser.add_argument("-r", "--ready", action="store_true", help="Keep only tickets whose dependencies are all done. A done ticket is never ready, so this never shows one.")
 
     graphParser: argparse.ArgumentParser = commands.add_parser("graph", help="Render the dependency graph as mermaid source.", formatter_class=RichHelpFormatter)
-    graphParser.add_argument("scope", nargs="?", metavar="SCOPE", help=f"What to scope to, read from its own shape: a ticket id, a key, or a status ({', '.join(STATUSES)}). The flags below are the same three, named explicitly.")
-    graphScope = graphParser.add_mutually_exclusive_group()
-    graphScope.add_argument("-i", "--id", help="Scope to one ticket's ancestors and descendants.")
-    graphScope.add_argument("-k", "--key", help=f"Scope to one key, plus its immediate cross-key neighbors. {keyOptions}")
-    graphScope.add_argument("-s", "--status", choices=STATUSES, help="Scope to the tickets with this status alone. Nothing outside it is borrowed, so an edge survives only when both of its ends carry the status.")
+    addScopeArguments(graphParser, keyOptions)
     graphParser.add_argument("-o", "--output", help="Write to a file rather than to stdout.")
 
     keyParser: argparse.ArgumentParser = commands.add_parser("key", help="Inspect and manage the key registry.", formatter_class=RichHelpFormatter)
@@ -280,19 +278,35 @@ def buildParser(config: Optional[Config] = None) -> argparse.ArgumentParser:
     keyRemoveParser: argparse.ArgumentParser = keyCommands.add_parser("remove", help="Remove a key no ticket uses.", formatter_class=RichHelpFormatter)
     keyRemoveParser.add_argument("key", help=f"The key to remove. {keyOptions}")
 
-    # Documents docket ships, rendered against this repository. This is a group rather than a bare command because what it prints is read somewhere else, and more than one such document is plausible.
-    docsParser: argparse.ArgumentParser = commands.add_parser("docs", help="Print a document docket ships, rendered for this repository.", formatter_class=RichHelpFormatter)
+    # Documents docket ships, rendered against this repository. This is a group rather than a bare command because each one is read somewhere else, and more than one such document was always plausible.
+    docsParser: argparse.ArgumentParser = commands.add_parser("docs", help="Write a document docket ships, rendered for this repository.", formatter_class=RichHelpFormatter)
     docsCommands = docsParser.add_subparsers(dest="docsCommand", metavar="SUBCOMMAND")
 
-    # Every document is written the same two ways, so the destination is declared once here and inherited by each one rather than repeated per document.
+    # Every document reaches its reader the same way, so the destination is declared once here and inherited by each one rather than repeated per document. A document is a file by default, unlike `graph`, because it is written to be kept and read later rather than piped into something else.
     docsOutput: argparse.ArgumentParser = argparse.ArgumentParser(add_help=False)
-    docsOutput.add_argument("-o", "--output", help="Write to a file rather than to stdout.")
+    docsOutput.add_argument("-o", "--output", help="Write to this file instead of the one the document is named for.")
+    docsOutput.add_argument("-p", "--print", dest="toPrint", action="store_true", help="Print to stdout instead of writing the file. Combined with -o/--output it does both, writing the file and printing it.")
 
     docsCommands.add_parser(
         "handoff",
-        help="Print the brief that teaches a chat system with no access to this repository how to write tickets for it by hand.",
+        help=f"Write the brief that teaches a chat system with no access to this repository how to write tickets for it by hand. Lands in {HANDOFF_FILENAME}.",
         parents=[docsOutput],
         formatter_class=RichHelpFormatter,
+    )
+
+    roadmapParser: argparse.ArgumentParser = docsCommands.add_parser(
+        "roadmap",
+        help=f"Write the dependency graph as a markdown document with an embedded mermaid diagram, for committing alongside the tickets. Lands in {ROADMAP_FILENAME}.",
+        parents=[docsOutput],
+        formatter_class=RichHelpFormatter,
+    )
+    addScopeArguments(roadmapParser, keyOptions)
+    roadmapParser.add_argument(
+        "-m",
+        "--max-nodes",
+        type=int,
+        dest="maxNodes",
+        help="How many nodes to aim for, overriding the configured maxRoadmapNodes. Past it the completed tickets furthest from the work still open are dropped, and open tickets are never dropped. Pass 0 for no ceiling.",
     )
 
     commands.add_parser("validate", help="Run every integrity rule.", formatter_class=RichHelpFormatter)
@@ -304,6 +318,24 @@ def buildParser(config: Optional[Config] = None) -> argparse.ArgumentParser:
     upgradeParser.add_argument("path", help="The repository root to upgrade.")
 
     return parser
+
+
+def addScopeArguments(parser: argparse.ArgumentParser, keyOptions: str) -> None:
+    """
+    Add the three ways of scoping a graph to a parser, in both their bare and their explicit spelling.
+
+    Both commands that draw a graph offer the same scopes, read by the same rules, and resolved by the same `resolveGraphScope`. Declaring them once is what keeps the two from drifting into disagreeing about what a bare token means.
+
+    parser: The parser to add the arguments to.
+    keyOptions: The sentence describing the registered keys, already built.
+    """
+
+    parser.add_argument("scope", nargs="?", metavar="SCOPE", help=f"What to scope to, read from its own shape: a ticket id, a key, or a status ({', '.join(STATUSES)}). The flags below are the same three, named explicitly.")
+
+    scopeGroup = parser.add_mutually_exclusive_group()
+    scopeGroup.add_argument("-i", "--id", help="Scope to one ticket's ancestors and descendants.")
+    scopeGroup.add_argument("-k", "--key", help=f"Scope to one key, plus its immediate cross-key neighbors. {keyOptions}")
+    scopeGroup.add_argument("-s", "--status", choices=STATUSES, help="Scope to the tickets with this status alone. Nothing outside it is borrowed, so an edge survives only when both of its ends carry the status.")
 
 
 def buildTicketParser(commands: argparse._SubParsersAction, priorityOptions: str) -> argparse.ArgumentParser:
