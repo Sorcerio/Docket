@@ -55,7 +55,7 @@ Filenames are frozen at creation. Retitling a ticket deliberately does not renam
 
 ## Tickets written outside this repository
 
-Docket ships a second document, printed by `docket docs handoff`, written for a chat system that has no access to this repository and has to write ticket files by hand.
+Docket ships a second document, written by `docket docs handoff`, for a chat system that has no access to this repository and has to write ticket files by hand.
 
 Its rules are deliberately the opposite of the ones above, because its reader has no tools to call. Do not follow it here. A file produced that way is an ordinary ticket the moment it lands, so `validate` is what confirms it and the tools above are what change it afterwards.
 
@@ -79,6 +79,12 @@ A word carrying an uppercase letter past its first character, or a digit anywher
 | See valid keys | `list_keys` |
 | Add a new key | `add_key`, after asking the user |
 | Check the set is sound | `validate` |
+
+## The committed roadmap
+
+This repository may keep a `roadmap.md`, which is the dependency graph as a diagram a reader can open on the repository page. It is generated, so never edit it by hand. Regenerate it with `docket docs roadmap` from a terminal, which is a command rather than a tool because it writes a file outside the ticket directories.
+
+The `graph` tool is what you call to see the same graph for yourself. It is the roadmap without the wrapper, and calling it changes nothing.
 
 ## Dependencies point one way
 

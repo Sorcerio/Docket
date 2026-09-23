@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from docket.core.config import DEFAULT_LOCK_TIMEOUT, Config, discoverConfig, findConfigPath, loadConfig
+from docket.core.config import DEFAULT_LOCK_TIMEOUT, DEFAULT_MAX_ROADMAP_NODES, Config, discoverConfig, findConfigPath, loadConfig
 from docket.core.errors import ConfigError, ConfigNotFoundError, InvalidKeyError, UnknownKeyError
 
 # MARK: Functions
@@ -150,6 +150,40 @@ def testALockTimeoutOfZeroOrLessIsRejected(tmp_path: Path, timeout: str) -> None
 
     configPath: Path = tmp_path / ".docket.toml"
     configPath.write_text(f"lockTimeout = {timeout}\n", encoding="utf-8", newline="\n")
+
+    with pytest.raises(ConfigError):
+        loadConfig(configPath)
+
+
+def testAnAbsentRoadmapCeilingFallsBackToTheDefault(tmp_path: Path) -> None:
+    """
+    An upgrade never rewrites a configuration, so every repository deployed before the roadmap existed carries no ceiling and must keep loading.
+    """
+
+    configPath: Path = tmp_path / ".docket.toml"
+    configPath.write_text('root = "docs/tickets"\n', encoding="utf-8", newline="\n")
+
+    assert loadConfig(configPath).maxRoadmapNodes == DEFAULT_MAX_ROADMAP_NODES
+
+
+def testARoadmapCeilingOfZeroIsAccepted(tmp_path: Path) -> None:
+    """
+    Zero is the documented way to ask for no ceiling at all, so it is a setting rather than a mistake.
+    """
+
+    configPath: Path = tmp_path / ".docket.toml"
+    configPath.write_text("maxRoadmapNodes = 0\n", encoding="utf-8", newline="\n")
+
+    assert loadConfig(configPath).maxRoadmapNodes == 0
+
+
+def testANegativeRoadmapCeilingIsRejected(tmp_path: Path) -> None:
+    """
+    A node count below zero names nothing, and zero already means what a writer reaching for it would have meant.
+    """
+
+    configPath: Path = tmp_path / ".docket.toml"
+    configPath.write_text("maxRoadmapNodes = -1\n", encoding="utf-8", newline="\n")
 
     with pytest.raises(ConfigError):
         loadConfig(configPath)

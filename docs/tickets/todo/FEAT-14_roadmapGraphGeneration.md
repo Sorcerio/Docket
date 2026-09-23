@@ -3,7 +3,7 @@ id: FEAT-14
 title: Roadmap Graph Generation
 status: todo
 priority: 2
-requires: [FEAT-6]
+requires: []
 metadata: {}
 ---
 

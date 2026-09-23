@@ -13,9 +13,10 @@ import re
 import pytest
 
 from docket.core.config import Config
-from docket.core.handoff import HANDOFF_TEMPLATE, KeyBriefing, buildContext, buildKeyBriefings, readDocument, renderHandoff
+from docket.core.handoff import HANDOFF_TEMPLATE, KeyBriefing, buildContext, buildKeyBriefings, renderHandoff
 from docket.core.ids import buildFilename, isValidId
 from docket.core.store import Store
+from docket.core.templating import readDocument
 from docket.core.ticket import STATUSES, Ticket, parseTicket
 from docket.core.titles import isTitleCase
 

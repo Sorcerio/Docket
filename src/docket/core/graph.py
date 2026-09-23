@@ -13,7 +13,7 @@ from typing import Iterable, Optional
 
 from docket.core.ids import parseId
 from docket.core.store import TicketSet
-from docket.core.ticket import Ticket
+from docket.core.ticket import STATUS_DONE, Ticket
 
 # MARK: Classes
 
@@ -136,6 +136,22 @@ class ResolvedGraph:
         return sorted((node for node in self.nodes.values() if node.key == key), key=lambda node: parseId(node.id)[1])
 
 
+@dataclass(frozen=True)
+class CulledGraph:
+    """
+    A graph narrowed to fit a node ceiling, and how much of it was left behind.
+
+    The count travels beside the graph rather than inside it, because a renderer has no use for it and the caller that asked for the cull does. A document meant to show where the work is going should not spend a line apologizing for the history it dropped, while the person who ran the command is owed the fact that something was dropped at all.
+    """
+
+    # MARK: Properties
+
+    graph: ResolvedGraph
+
+    # How many nodes the ceiling cost, which is zero whenever the graph already fit.
+    dropped: int = 0
+
+
 # MARK: Functions
 
 
@@ -246,6 +262,84 @@ def subgraphForStatus(graph: ResolvedGraph, status: str) -> ResolvedGraph:
     members: set[str] = {node.id for node in graph.nodes.values() if node.status == status}
 
     return _restrict(graph, members, scope=status)
+
+
+def scopeGraph(graph: ResolvedGraph, ticketId: Optional[str] = None, key: Optional[str] = None, status: Optional[str] = None) -> ResolvedGraph:
+    """
+    Apply whichever of the three scopes was asked for, and return the graph untouched when none was.
+
+    The three remain exclusive, so the first one set is the one that applies and a caller passing two has already been refused by the grammar that read them. Checking that a key is registered or that a status is spelled correctly belongs to the caller, since the CLI and the server learn those from different places and report them differently.
+
+    graph: The graph to scope.
+    ticketId: The ticket to center on, or `None`.
+    key: The key to scope to, or `None`.
+    status: The status to scope to, or `None`.
+
+    Returns the scoped graph, or the same graph when nothing scoped it.
+    """
+
+    if ticketId is not None:
+        return subgraphForId(graph, ticketId)
+
+    if key is not None:
+        return subgraphForKey(graph, key)
+
+    if status is not None:
+        return subgraphForStatus(graph, status)
+
+    return graph
+
+
+def cullGraph(graph: ResolvedGraph, maxNodes: int) -> CulledGraph:
+    """
+    Narrow a graph toward a node ceiling by dropping the finished work furthest from the work still open.
+
+    Every unfinished ticket survives, whatever the ceiling says, and the finished ones are then admitted ring by ring outward from that seed along both edge directions. So a completed ticket something open still depends on stays, its own dependencies stay behind it while there is room, and the history nothing open reaches any more is what goes first.
+
+    The ceiling is therefore a target rather than a cap. A repository whose open work alone exceeds it keeps all of that work and every finished ticket is dropped, because a roadmap that hides a live ticket is worse than one that renders slowly, and choosing which live ticket to hide is not a choice this can make well.
+
+    A ring that will not fit whole is filled in id order, so the same graph always culls to the same nodes and a committed document does not churn between runs.
+
+    graph: The graph to narrow.
+    maxNodes: The node count to aim for, or zero and below for no ceiling at all.
+
+    Returns the narrowed graph and the number of nodes it cost.
+    """
+
+    # Nothing to do when no ceiling was asked for, or when the graph already sits under the one that was.
+    if maxNodes <= 0 or len(graph) <= maxNodes:
+        return CulledGraph(graph=graph)
+
+    # Seed with everything still open, which is the part of the graph a reader is looking for and the part that is never given up.
+    included: set[str] = {node.id for node in graph.nodes.values() if node.status != STATUS_DONE}
+
+    # Walk outward from that seed, one distance ring at a time, until the ceiling is met or the reachable graph runs out.
+    frontier: set[str] = included
+    while len(included) < maxNodes:
+        ring: set[str] = set()
+        for nodeId in frontier:
+            node: GraphNode = graph.nodes[nodeId]
+            ring |= set(node.requires) | set(node.requiredBy)
+
+        # A node keeps its full edge lists through a scoping, so a neighbor may name something this graph does not hold.
+        ring &= graph.nodes.keys()
+        ring -= included
+
+        # Nothing further out is reachable, so the ceiling is met with room to spare.
+        if not ring:
+            break
+
+        # A ring that overflows is taken in part, by id, since every member of it sits at the same distance and nothing else distinguishes them.
+        remaining: int = maxNodes - len(included)
+        if len(ring) > remaining:
+            included |= set(_orderedIds(ring)[:remaining])
+            break
+
+        included |= ring
+        frontier = ring
+
+    # The scope is carried across, since narrowing a graph does not change what it was scoped to.
+    return CulledGraph(graph=_restrict(graph, included, scope=graph.scope), dropped=len(graph) - len(included))
 
 
 def dependencyContext(ticketSet: TicketSet, ticketId: str) -> dict[str, list[dict[str, object]]]:

@@ -36,6 +36,9 @@ DEFAULT_PRIORITY: int = 2
 DEFAULT_MAX_PRIORITY: int = 4
 DEFAULT_LOCK_TIMEOUT: float = 5.0
 
+# How many nodes a rendered roadmap aims to hold. Mermaid lays out a few hundred before a diagram stops being readable at any zoom, and a repository with more history than that would rather lose the history than the shape of what is ahead.
+DEFAULT_MAX_ROADMAP_NODES: int = 200
+
 # MARK: Classes
 
 
@@ -69,6 +72,7 @@ class Config:
         self.defaultPriority: int = readInt(document, "defaultPriority", ConfigError, source, DEFAULT_PRIORITY)
         self.maxPriority: int = readInt(document, "maxPriority", ConfigError, source, DEFAULT_MAX_PRIORITY)
         self.lockTimeout: float = readFloat(document, "lockTimeout", ConfigError, source, DEFAULT_LOCK_TIMEOUT)
+        self.maxRoadmapNodes: int = readInt(document, "maxRoadmapNodes", ConfigError, source, DEFAULT_MAX_ROADMAP_NODES)
 
         # A default outside the allowed band would make every created ticket invalid, so catch it at load.
         if not 0 <= self.defaultPriority <= self.maxPriority:
@@ -77,6 +81,10 @@ class Config:
         # A timeout of zero or less would fail every operation that ever met contention, so it is never what the writer meant.
         if self.lockTimeout <= 0:
             raise ConfigError(f"lockTimeout {self.lockTimeout} in {self.path} must be greater than 0. It is a wait in seconds.")
+
+        # Zero is the documented way to ask for no ceiling at all, so only a negative number is meaningless here.
+        if self.maxRoadmapNodes < 0:
+            raise ConfigError(f"maxRoadmapNodes {self.maxRoadmapNodes} in {self.path} cannot be negative. It is a node count, and 0 means no ceiling.")
 
     # MARK: Properties
 

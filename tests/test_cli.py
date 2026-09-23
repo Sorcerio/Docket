@@ -33,6 +33,8 @@ from docket.cli import (
 )
 from docket.core.config import Config, loadConfig
 from docket.core.errors import ConflictingArgumentsError, InvalidArgumentError, InvalidIdError
+from docket.core.handoff import HANDOFF_FILENAME
+from docket.core.roadmap import ROADMAP_FILENAME
 
 # MARK: Fixtures
 
@@ -788,21 +790,57 @@ def testTheOldFlatCommandsAreGone(inRepo: Path, command: list[str]) -> None:
     assert excInfo.value.code == EXIT_USAGE
 
 
-def testDocsHandoffWritesTheBriefToStdout(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def testDocsHandoffWritesItsPrescribedFile(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """
-    The brief is meant to be redirected to a file or pasted into another chat, so it bypasses `rich` exactly as mermaid source does.
+    A document is written to be kept and read later rather than piped, so it lands in the repository without being asked to.
     """
 
     assert main(["docs", "handoff"]) == EXIT_OK
+    assert "Wrote" in capsys.readouterr().out
+
+    written: str = (inRepo / HANDOFF_FILENAME).read_text(encoding="utf-8")
+
+    assert written.startswith("# Writing Tickets for Docket, Offsite\n")
+
+    # Rendered inside a repository, the brief names that repository's registry rather than teaching the reader to invent one.
+    assert "`CORE-1`" in written
+    assert "No keys were available" not in written
+
+
+def testDocsHandoffPrintsTheBriefToStdout(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Printing is what pastes the brief into another chat, so it bypasses `rich` exactly as mermaid source does and writes no file on the way.
+    """
+
+    assert main(["docs", "handoff", "--print"]) == EXIT_OK
 
     out: str = capsys.readouterr().out
 
     assert out.startswith("# Writing Tickets for Docket, Offsite\n")
     assert "\x1b" not in out
+    assert "Wrote" not in out
 
-    # Rendered inside a repository, the brief names that repository's registry rather than teaching the reader to invent one.
-    assert "`CORE-1`" in out
-    assert "No keys were available" not in out
+    # Printing replaces the prescribed file rather than adding to it, which is what keeps a bare print clean enough to pipe.
+    assert not (inRepo / HANDOFF_FILENAME).exists()
+
+
+def testDocsPrintAndOutputTogetherDoBoth(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The two are deliberately not exclusive, so a caller can keep the file and read it in the same breath.
+    """
+
+    target: Path = inRepo / "brief.md"
+
+    assert main(["docs", "handoff", "--print", "--output", str(target)]) == EXIT_OK
+
+    out: str = capsys.readouterr().out
+
+    assert "Wrote" in out
+    assert "# Writing Tickets for Docket, Offsite" in out
+    assert target.is_file()
+
+    # The named destination replaced the prescribed one rather than joining it.
+    assert not (inRepo / HANDOFF_FILENAME).exists()
 
 
 def testDocsHandoffRendersOutsideARepository(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -813,11 +851,26 @@ def testDocsHandoffRendersOutsideARepository(tmp_path: Path, capsys: pytest.Capt
     previous: str = os.getcwd()
     os.chdir(tmp_path)
     try:
-        assert main(["docs", "handoff"]) == EXIT_OK
+        assert main(["docs", "handoff", "--print"]) == EXIT_OK
     finally:
         os.chdir(previous)
 
     assert "No keys were available" in capsys.readouterr().out
+
+
+def testDocsHandoffWritesBesideAMissingConfiguration(tmp_path: Path) -> None:
+    """
+    Without a repository there is no root to write into, so the working directory is the only honest place the prescribed file can land.
+    """
+
+    previous: str = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        assert main(["docs", "handoff"]) == EXIT_OK
+    finally:
+        os.chdir(previous)
+
+    assert (tmp_path / HANDOFF_FILENAME).is_file()
 
 
 def testDocsHandoffWritesToAnOutputPath(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -829,6 +882,9 @@ def testDocsHandoffWritesToAnOutputPath(inRepo: Path, capsys: pytest.CaptureFixt
 
     assert main(["docs", "handoff", "--output", str(target)]) == EXIT_OK
     assert "Wrote" in capsys.readouterr().out
+
+    # A named destination replaces the prescribed one rather than adding to it.
+    assert not (inRepo / HANDOFF_FILENAME).exists()
 
     # The file holds the document itself, rendered for this repository rather than the fallback.
     written: str = target.read_text(encoding="utf-8")
@@ -855,7 +911,126 @@ def testDocsRefusesAnUnknownSubcommand(inRepo: Path, capsys: pytest.CaptureFixtu
     """
 
     assert main(["docs"]) == EXIT_USAGE
-    assert "Expected one of: handoff." in capsys.readouterr().err
+    assert "Expected one of: handoff, roadmap." in capsys.readouterr().err
+
+
+def testDocsRoadmapWritesItsPrescribedFile(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The roadmap exists to be committed alongside the tickets, so the bare command is the whole of what a person or a hook has to run.
+    """
+
+    main(["new", "CORE", "App Shell"])
+    capsys.readouterr()
+
+    assert main(["docs", "roadmap"]) == EXIT_OK
+    assert "Wrote" in capsys.readouterr().out
+
+    written: str = (inRepo / ROADMAP_FILENAME).read_text(encoding="utf-8")
+
+    assert written.startswith("# Roadmap\n")
+
+    # The fence is the whole difference between this and what `graph` prints.
+    assert "```mermaid\n" in written
+    assert "CORE-1" in written
+
+
+def testDocsRoadmapPrintsWithoutWriting(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Printing is how the document is read without leaving anything behind, which matters most for a file the repository would otherwise commit.
+    """
+
+    main(["new", "CORE", "App Shell"])
+    capsys.readouterr()
+
+    assert main(["docs", "roadmap", "--print"]) == EXIT_OK
+
+    out: str = capsys.readouterr().out
+
+    assert out.startswith("# Roadmap\n")
+    assert "\x1b" not in out
+    assert not (inRepo / ROADMAP_FILENAME).exists()
+
+
+def testDocsRoadmapScopesFromABareToken(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The roadmap reads a scope by the same rules the graph does, since both resolve it through the same grammar.
+    """
+
+    main(["new", "CORE", "App Shell"])
+    main(["new", "GEN", "Map Generation"])
+    capsys.readouterr()
+
+    assert main(["docs", "roadmap", "GEN", "--print"]) == EXIT_OK
+
+    out: str = capsys.readouterr().out
+
+    assert out.startswith("# Roadmap: GEN\n")
+    assert "GEN-1" in out
+
+    # A key scope borrows only what neighbors it, and nothing here does.
+    assert "CORE-1" not in out
+
+
+def testDocsRoadmapRefusesAnUnregisteredKey(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Scoping to a key nobody registered would draw an empty diagram, which reads as an answer rather than the typo it is.
+    """
+
+    assert main(["docs", "roadmap", "NOPE", "--print"]) == EXIT_USAGE
+    assert "is not registered" in capsys.readouterr().err
+
+
+def testDocsRoadmapReportsWhatTheCeilingDropped(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The document says nothing about the omission, so the confirmation line is the only place a person learns the diagram is not the whole graph.
+    """
+
+    main(["new", "CORE", "App Shell"])
+    main(["new", "CORE", "Second"])
+    main(["CORE-1", "done"])
+    capsys.readouterr()
+
+    assert main(["docs", "roadmap", "--max-nodes", "1"]) == EXIT_OK
+
+    out: str = capsys.readouterr().out
+
+    assert "1 completed ticket(s) omitted" in out
+
+    # Open work survives a ceiling it does not fit under, and the finished ticket is what paid for it.
+    written: str = (inRepo / ROADMAP_FILENAME).read_text(encoding="utf-8")
+
+    assert "CORE-2" in written
+    assert "CORE-1" not in written
+
+
+def testDocsRoadmapSaysNothingWhenNothingWasDropped(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    A repository under the ceiling never hears about the ceiling, since a note about nothing is noise.
+    """
+
+    main(["new", "CORE", "App Shell"])
+    capsys.readouterr()
+
+    assert main(["docs", "roadmap"]) == EXIT_OK
+    assert "omitted" not in capsys.readouterr().out
+
+
+def testDocsRoadmapCeilingComesFromTheConfiguration(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The ceiling is a property of how a repository renders its roadmap, so the bare command honors it without the flag.
+    """
+
+    main(["new", "CORE", "App Shell"])
+    main(["new", "CORE", "Second"])
+    main(["CORE-1", "done"])
+
+    # The field goes above `[keys]`, since anything after that header would be read as a key rather than as a top-level setting.
+    configPath: Path = inRepo / ".docket.toml"
+    configPath.write_text(configPath.read_text(encoding="utf-8").replace("[keys]", "maxRoadmapNodes = 1\n\n[keys]"), encoding="utf-8", newline="\n")
+    capsys.readouterr()
+
+    assert main(["docs", "roadmap"]) == EXIT_OK
+    assert "1 completed ticket(s) omitted" in capsys.readouterr().out
 
 
 def testGraphWritesBareMermaidToStdout(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:

@@ -11,20 +11,18 @@ The brief is one document handed to a chat system that has no connection to this
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from jinja2 import Environment, StrictUndefined, Template
-
 from docket.core.config import DEFAULT_MAX_PRIORITY, DEFAULT_PRIORITY, DEFAULT_ROOT, DEFAULT_TODO_DIR, Config
 from docket.core.ids import nextId
-from docket.core.resources import readPackageText
 from docket.core.store import Store
+from docket.core.templating import renderDocument
 
 # MARK: Constants
 
-# The directory inside the package holding documents written to be read by someone, kept apart from `templates` because those are files a repository receives rather than text a person is handed.
-DOCS_DIRECTORY: str = "docs"
-
 # The brief itself.
 HANDOFF_TEMPLATE: str = "writingTicketsOffsite.md.jinja"
+
+# What the brief is called once it has been written into a repository.
+HANDOFF_FILENAME: str = "handoff.md"
 
 # MARK: Classes
 
@@ -45,18 +43,6 @@ class KeyBriefing:
 
 
 # MARK: Functions
-
-
-def readDocument(name: str) -> str:
-    """
-    Read a document shipped inside the package.
-
-    name: The document filename.
-
-    Returns the document text.
-    """
-
-    return readPackageText(DOCS_DIRECTORY, name)
 
 
 def buildKeyBriefings(store: Store) -> list[KeyBriefing]:
@@ -117,18 +103,4 @@ def renderHandoff(store: Optional[Store] = None) -> str:
     Returns the rendered document.
     """
 
-    template: Template = _buildEnvironment().from_string(readDocument(HANDOFF_TEMPLATE))
-
-    return template.render(buildContext(store))
-
-
-def _buildEnvironment() -> Environment:
-    """
-    Build the environment every shipped document renders through.
-
-    Autoescaping is off because the output is markdown a person reads, and escaping it would corrupt the very syntax the brief is teaching. An undefined name raises rather than rendering as nothing, so a template naming something the context does not carry fails here instead of reaching the reader as a hole in a sentence.
-
-    Returns the environment.
-    """
-
-    return Environment(undefined=StrictUndefined, trim_blocks=True, lstrip_blocks=True, keep_trailing_newline=True, autoescape=False)
+    return renderDocument(HANDOFF_TEMPLATE, buildContext(store))
