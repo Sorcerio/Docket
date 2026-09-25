@@ -13,8 +13,10 @@ import sys
 from typing import Optional
 
 from docket.cli.commands import (
+    FIELD_READERS,
     commandDeploy,
     commandDocs,
+    commandField,
     commandGraph,
     commandKey,
     commandList,
@@ -24,7 +26,6 @@ from docket.cli.commands import (
     commandSet,
     commandShow,
     commandStatus,
-    commandStatusRead,
     commandTicket,
     commandValidate,
     documentPath,
@@ -32,10 +33,12 @@ from docket.cli.commands import (
     requireScopeKey,
 )
 from docket.cli.grammar import (
+    ACCESSORS,
     CLEAR_SENTINEL,
     EXIT_INVALID,
     EXIT_OK,
     EXIT_USAGE,
+    FIELD_ACCESSORS,
     OUTPUT_ARGUMENT,
     PROGRAM_NAME,
     TICKET_COMMAND,
@@ -64,10 +67,13 @@ from docket.core.store import Store
 
 # `docket.cli` was one module before it was a package, and it is what `pyproject.toml` names as the console script. Everything the outside world reached for then is still reachable by the same path.
 __all__: list[str] = [
+    "ACCESSORS",
     "CLEAR_SENTINEL",
     "EXIT_INVALID",
     "EXIT_OK",
     "EXIT_USAGE",
+    "FIELD_ACCESSORS",
+    "FIELD_READERS",
     "OUTPUT_ARGUMENT",
     "PROGRAM_NAME",
     "STATUS_STYLES",
@@ -83,6 +89,7 @@ __all__: list[str] = [
     "classifyToken",
     "commandDeploy",
     "commandDocs",
+    "commandField",
     "commandGraph",
     "commandKey",
     "commandList",
@@ -92,7 +99,6 @@ __all__: list[str] = [
     "commandSet",
     "commandShow",
     "commandStatus",
-    "commandStatusRead",
     "commandTicket",
     "commandValidate",
     "describeKeys",

@@ -6,6 +6,7 @@ Drive `main` against a real repository on disk, covering dispatch, exit codes, a
 
 # MARK: Imports
 
+import json
 import os
 from pathlib import Path
 from typing import Iterator, Optional
@@ -13,9 +14,12 @@ from typing import Iterator, Optional
 import pytest
 
 from docket.cli import (
+    ACCESSORS,
     EXIT_INVALID,
     EXIT_OK,
     EXIT_USAGE,
+    FIELD_ACCESSORS,
+    FIELD_READERS,
     TICKET_COMMAND,
     TOKEN_ID,
     TOKEN_KEY,
@@ -35,6 +39,8 @@ from docket.core.config import Config, loadConfig
 from docket.core.errors import ConflictingArgumentsError, InvalidArgumentError, InvalidIdError
 from docket.core.handoff import HANDOFF_FILENAME
 from docket.core.roadmap import ROADMAP_FILENAME
+from docket.core.store import Store
+from docket.core.ticket import CANONICAL_FIELDS
 
 # MARK: Fixtures
 
@@ -546,16 +552,50 @@ def testMetaReadingAnUnsetKeyFails(inRepo: Path, capsys: pytest.CaptureFixture[s
     assert "video" in captured.err
 
 
-def testMetaWithNoMetadataSaysSo(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def testMetaPrintsTheWholeMapAsJson(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """
-    A ticket with an empty metadata map is stated rather than printed as a bare table.
+    The whole map goes out as JSON with no styling once stdout is not a terminal, so it parses exactly as written.
+    """
+
+    main(["new", "CORE", "Skirmish Setup"])
+    main(["CORE-1", "meta", "video", "2026-01-devlog"])
+    main(["CORE-1", "meta", "clip", "intro"])
+    capsys.readouterr()
+
+    assert main(["CORE-1", "meta"]) == EXIT_OK
+
+    out: str = capsys.readouterr().out
+
+    assert json.loads(out) == {"video": "2026-01-devlog", "clip": "intro"}
+    assert "\x1b" not in out
+
+
+def testMetaWithNoMetadataPrintsAnEmptyObject(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    An empty map is still valid JSON rather than a sentence, so a pipe into a parser never breaks on it.
     """
 
     main(["new", "CORE", "Skirmish Setup"])
     capsys.readouterr()
 
     assert main(["CORE-1", "meta"]) == EXIT_OK
-    assert "No metadata." in capsys.readouterr().out
+    assert json.loads(capsys.readouterr().out) == {}
+
+
+def testMetaWithAKeyPrintsAStructuredValueAsJson(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    A value with structure goes out as JSON rather than in Python's own spelling, which no shell tool could parse.
+    """
+
+    main(["new", "CORE", "Skirmish Setup"])
+    main(["CORE-1", "meta", "video", "x"])
+    capsys.readouterr()
+
+    # The CLI only writes strings, so a structured value is one written through the store, the way an MCP caller would.
+    Store(loadConfig(inRepo / ".docket.toml")).setMetadata(ticketId="CORE-1", key="clip", value={"start": 12, "end": 40})
+
+    assert main(["CORE-1", "meta", "clip"]) == EXIT_OK
+    assert json.loads(capsys.readouterr().out) == {"start": 12, "end": 40}
 
 
 def testMetaClearsAKeyWithTheFlag(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -571,7 +611,7 @@ def testMetaClearsAKeyWithTheFlag(inRepo: Path, capsys: pytest.CaptureFixture[st
     capsys.readouterr()
 
     main(["CORE-1", "meta"])
-    assert "No metadata." in capsys.readouterr().out
+    assert json.loads(capsys.readouterr().out) == {}
 
 
 def testMetaRejectsAValueTogetherWithClear(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -713,6 +753,97 @@ def testReadyOnAnUnknownTicketFails(inRepo: Path, capsys: pytest.CaptureFixture[
 
     assert main(["CORE-99", "ready"]) == EXIT_USAGE
     assert "CORE-99" in capsys.readouterr().err
+
+
+def testEveryFrontmatterFieldHasAnAccessor() -> None:
+    """
+    A frontmatter field the CLI cannot read is a field a script cannot reach, so adding one without an accessor fails here rather than going unnoticed.
+    """
+
+    assert set(FIELD_ACCESSORS) == set(CANONICAL_FIELDS)
+
+    # Every accessor named must be a command the ticket branch actually registers.
+    ticketCommands: set[str] = {*ACCESSORS, "meta"}
+    for accessor in FIELD_ACCESSORS.values():
+        assert accessor is None or accessor in ticketCommands
+
+
+def testEveryAccessorHasAReader() -> None:
+    """
+    The grammar and the handler each hold one side of an accessor, so they must name exactly the same set.
+    """
+
+    assert set(FIELD_READERS) == set(ACCESSORS)
+
+
+@pytest.mark.parametrize(
+    ("accessor", "expected"),
+    [
+        ("title", "Deployment\n"),
+        ("status", "todo\n"),
+        ("priority", "3\n"),
+        ("key", "CORE\n"),
+        ("requires", "CORE-1\nGEN-1\n"),
+        ("ready", "false\n"),
+    ],
+)
+def testAnAccessorPrintsOnlyItsValue(inRepo: Path, capsys: pytest.CaptureFixture[str], accessor: str, expected: str) -> None:
+    """
+    Every accessor yields the bare value and nothing else, so a shell can read the answer as easily as a person can.
+    """
+
+    main(["new", "CORE", "Skirmish Setup"])
+    main(["new", "GEN", "Map Generator"])
+    main(["new", "CORE", "Deployment", "--requires", "CORE-1,GEN-1", "--priority", "3"])
+    capsys.readouterr()
+
+    assert main(["CORE-2", accessor]) == EXIT_OK
+
+    out: str = capsys.readouterr().out
+
+    assert out == expected
+    assert "\x1b" not in out
+
+
+def testRequiredByPrintsTheReverseDirection(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The file never stores what depends on it, so the reverse side is derived and printed one id per line like its forward counterpart.
+    """
+
+    main(["new", "CORE", "Skirmish Setup"])
+    main(["new", "CORE", "Deployment", "--requires", "CORE-1"])
+    main(["new", "CORE", "Victory", "--requires", "CORE-1"])
+    capsys.readouterr()
+
+    assert main(["CORE-1", "required-by"]) == EXIT_OK
+    assert capsys.readouterr().out == "CORE-2\nCORE-3\n"
+
+
+@pytest.mark.parametrize("accessor", ["requires", "required-by"])
+def testAnEmptyIdListPrintsNothing(inRepo: Path, capsys: pytest.CaptureFixture[str], accessor: str) -> None:
+    """
+    No ids is no lines, so a loop over the output runs zero times rather than once over a placeholder.
+    """
+
+    main(["new", "CORE", "Skirmish Setup"])
+    capsys.readouterr()
+
+    assert main(["CORE-1", accessor]) == EXIT_OK
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("accessor", sorted(ACCESSORS))
+def testAnAccessorOnAnUnknownTicketFails(inRepo: Path, capsys: pytest.CaptureFixture[str], accessor: str) -> None:
+    """
+    A ticket that does not exist has nothing to read, so every accessor fails the way naming an unknown ticket always does, with nothing on stdout.
+    """
+
+    assert main(["CORE-99", accessor]) == EXIT_USAGE
+
+    captured = capsys.readouterr()
+
+    assert captured.out == ""
+    assert "CORE-99" in captured.err
 
 
 def testListReadyKeepsOnlyUnblockedTickets(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:

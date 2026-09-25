@@ -43,6 +43,27 @@ TOKEN_PRIORITY: str = "priority"
 # The word that clears a comma-separated list argument. An id can never collide with it, since every id is an uppercase key followed by a hyphen and a number.
 CLEAR_SENTINEL: str = "none"
 
+# The commands that print one thing about a ticket and nothing else, for a pipe to read, each with its help text. The name is the subcommand that reaches it and the key `commands` looks its reader up by, so this one table is the whole vocabulary of reads.
+ACCESSORS: dict[str, str] = {
+    "title": "Print the ticket's title and nothing else, for a pipe to read.",
+    "status": "Print the ticket's status and nothing else, for a pipe to read.",
+    "priority": "Print the ticket's priority and nothing else, for a pipe to read.",
+    "requires": "Print the ids this ticket depends on, one per line, for a pipe to read. Prints nothing when there are none.",
+    "required-by": "Print the ids of the tickets depending on this one, one per line, for a pipe to read. Prints nothing when there are none.",
+    "key": "Print the key portion of the ticket's id and nothing else, for a pipe to read.",
+    "ready": "Print whether every dependency is done, as a bare true or false, for a pipe to read.",
+}
+
+# The command that reads each frontmatter field. `id` has none, since it is what was typed to reach the ticket, and `metadata` is read through `meta` because that command also writes it. A field missing from here fails the suite, which is what keeps a new field from arriving without a way to read it.
+FIELD_ACCESSORS: dict[str, Optional[str]] = {
+    "id": None,
+    "title": "title",
+    "status": "status",
+    "priority": "priority",
+    "requires": "requires",
+    "metadata": "meta",
+}
+
 # How a destination is named when a message has to talk about it. The graph and the shipped documents share the flag, so they share its name too.
 OUTPUT_ARGUMENT: str = "--output path"
 
@@ -389,8 +410,10 @@ def buildTicketParser(commands: argparse._SubParsersAction, priorityOptions: str
     ticketCommands = ticketParser.add_subparsers(dest="ticketCommand", metavar="COMMAND")
 
     ticketCommands.add_parser("show", help="Show the ticket with its resolved dependency context. This is what a bare id does.", formatter_class=RichHelpFormatter)
-    ticketCommands.add_parser("status", help="Print the ticket's status and nothing else, for a pipe to read.", formatter_class=RichHelpFormatter)
-    ticketCommands.add_parser("ready", help="Print whether every dependency is done, as a bare true or false, for a pipe to read.", formatter_class=RichHelpFormatter)
+
+    # Every read is registered from the one table, so a new one needs no parser code of its own.
+    for accessor, accessorHelp in ACCESSORS.items():
+        ticketCommands.add_parser(accessor, help=accessorHelp, formatter_class=RichHelpFormatter)
 
     # One parser per status is what makes 'docket CORE-14 done' work. It also puts the whole vocabulary into the error when a command is misspelled, which a single `choices` list on a value argument could not do.
     for status in STATUSES:
@@ -405,7 +428,7 @@ def buildTicketParser(commands: argparse._SubParsersAction, priorityOptions: str
 
     # How much of the call was typed is what it means, the same way a status reads with no value and writes with one.
     metaParser: argparse.ArgumentParser = ticketCommands.add_parser("meta", help="Inspect and manage the ticket's metadata map.", formatter_class=RichHelpFormatter)
-    metaParser.add_argument("key", nargs="?", metavar="KEY", help="The metadata key. Namespace it, for example 'video', so it cannot collide with another tool's key. Omit it to show the whole map.")
+    metaParser.add_argument("key", nargs="?", metavar="KEY", help="The metadata key. Namespace it, for example 'video', so it cannot collide with another tool's key. Omit it to print the whole map as JSON.")
     metaParser.add_argument("value", nargs="?", metavar="VALUE", help="The value to store. Omit it to print the key's value and nothing else.")
     metaParser.add_argument("-c", "--clear", action="store_true", help="Remove the key instead of setting it.")
 

@@ -10,23 +10,36 @@ No rules live here either. A handler decides what to say, never what is true.
 
 import argparse
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from rich.table import Table
 from rich.text import Text
 
-from docket.cli.grammar import EXIT_INVALID, EXIT_OK, EXIT_USAGE, OUTPUT_ARGUMENT, parseEditIdList, parseIdList, resolveGraphScope, resolveListFilters
+from docket.cli.grammar import ACCESSORS, EXIT_INVALID, EXIT_OK, EXIT_USAGE, OUTPUT_ARGUMENT, parseEditIdList, parseIdList, resolveGraphScope, resolveListFilters
 from docket.cli.output import STATUS_STYLES, Output, buildContextTable, relativeToRoot
 from docket.core.config import Config, discoverConfig
 from docket.core.deploy import DeployReport, deploy, upgrade
 from docket.core.handoff import HANDOFF_FILENAME, renderHandoff
-from docket.core.graph import Readiness, ResolvedGraph, dependencyContext, readyTickets, resolveGraph, scopeGraph, ticketReadiness
+from docket.core.graph import ResolvedGraph, dependencyContext, readyTickets, resolveGraph, scopeGraph, ticketReadiness
 from docket.core.inputs import requireWritableFile, writeFile
 from docket.core.mermaid import renderGraph
 from docket.core.roadmap import ROADMAP_FILENAME, Roadmap, buildRoadmap
 from docket.core.store import Store, TicketResult, TicketSet
 from docket.core.ticket import STATUSES, Ticket
 from docket.core.validate import SEVERITY_ERROR, ValidationReport, validate
+
+# MARK: Constants
+
+# How each accessor in the grammar reads its answer off a ticket. The store is passed alongside the ticket because a derived answer, such as the reverse dependencies or readiness, cannot be read from one ticket alone. A list comes back for a list of ids, which `commandField` prints one per line.
+FIELD_READERS: dict[str, Callable[[Store, Ticket], object]] = {
+    "title": lambda store, ticket: ticket.title,
+    "status": lambda store, ticket: ticket.status,
+    "priority": lambda store, ticket: ticket.priority,
+    "requires": lambda store, ticket: list(ticket.requires),
+    "required-by": lambda store, ticket: [entry["id"] for entry in dependencyContext(store.loadAll(), ticket.id)["requiredBy"]],
+    "key": lambda store, ticket: ticket.key,
+    "ready": lambda store, ticket: ticketReadiness(store.loadAll(), ticket.id).isReady,
+}
 
 # MARK: Functions
 
@@ -50,11 +63,13 @@ def commandTicket(args: argparse.Namespace, store: Store, output: Output) -> int
     if args.ticketCommand in STATUSES:
         return commandStatus(args, store, output)
 
+    # Every read shares one handler, since what differs between them is only which value is read.
+    if args.ticketCommand in ACCESSORS:
+        return commandField(args, store, output)
+
     handlers = {
         None: commandShow,
         "show": commandShow,
-        "status": commandStatusRead,
-        "ready": commandReady,
         "set": commandSet,
         "meta": commandMeta,
     }
@@ -226,33 +241,11 @@ def commandStatus(args: argparse.Namespace, store: Store, output: Output) -> int
     return EXIT_OK
 
 
-def commandStatusRead(args: argparse.Namespace, store: Store, output: Output) -> int:
+def commandField(args: argparse.Namespace, store: Store, output: Output) -> int:
     """
-    Print a ticket's status and nothing else.
+    Print one thing about a ticket and nothing else.
 
-    This goes out raw, with no styling and no surrounding words, so a shell can read the answer as easily as a person can.
-
-    Args:
-        args: The parsed arguments.
-        store: The store to read from.
-        output: Where to write.
-
-    Returns:
-        The process exit code.
-    """
-
-    ticket: Ticket = store.load(args.id)
-
-    output.raw(f"{ticket.status}\n")
-
-    return EXIT_OK
-
-
-def commandReady(args: argparse.Namespace, store: Store, output: Output) -> int:
-    """
-    Print whether a ticket's dependencies are all done, and nothing else.
-
-    This goes out raw for the same reason `status` does. What is blocking is deliberately left to `show`, which already tables both dependency directions with their statuses.
+    This goes out raw, with no styling and no surrounding words, so a shell can read the answer as easily as a person can. A list of ids is written one per line and anything else through `Output.value`. What is blocking a ticket that is not ready is deliberately left to `show`, which already tables both dependency directions with their statuses.
 
     Args:
         args: The parsed arguments.
@@ -263,9 +256,12 @@ def commandReady(args: argparse.Namespace, store: Store, output: Output) -> int:
         The process exit code, which reports whether the question could be answered rather than what the answer was.
     """
 
-    readiness: Readiness = ticketReadiness(store.loadAll(), args.id)
+    value: object = FIELD_READERS[args.ticketCommand](store, store.load(args.id))
 
-    output.raw(f"{'true' if readiness.isReady else 'false'}\n")
+    if isinstance(value, list):
+        output.lines(value)
+    else:
+        output.value(value)
 
     return EXIT_OK
 
@@ -291,20 +287,8 @@ def commandMeta(args: argparse.Namespace, store: Store, output: Output) -> int:
             output.error("Nothing to clear. Name the metadata key to remove.")
             return EXIT_USAGE
 
-        ticket: Ticket = store.load(args.id)
-
-        if not ticket.metadata:
-            output.print("[dim]No metadata.[/dim]")
-            return EXIT_OK
-
-        table: Table = Table(box=None, pad_edge=False)
-        table.add_column("KEY", style="bold")
-        table.add_column("VALUE")
-
-        for key, value in ticket.metadata.items():
-            table.add_row(key, str(value))
-
-        output.print(table)
+        # The whole map goes out as JSON, including an empty one, so a pipe into `jq` never meets a sentence where the object should be.
+        output.json(store.load(args.id).metadata)
 
         return EXIT_OK
 
@@ -312,15 +296,15 @@ def commandMeta(args: argparse.Namespace, store: Store, output: Output) -> int:
         output.error("Cannot pass a value together with -c/--clear.")
         return EXIT_USAGE
 
-    # A key with no value reads that entry, raw, for the same reason `status` does.
+    # A key with no value reads that entry, raw, for the same reason `status` does. A structured value goes out as JSON rather than in Python's own spelling.
     if not args.clear and args.value is None:
-        ticket = store.load(args.id)
+        ticket: Ticket = store.load(args.id)
 
         if args.key not in ticket.metadata:
             output.error(f"'{args.key}' is not set on {ticket.id}.")
             return EXIT_USAGE
 
-        output.raw(f"{ticket.metadata[args.key]}\n")
+        output.value(ticket.metadata[args.key])
 
         return EXIT_OK
 
