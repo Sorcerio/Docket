@@ -12,6 +12,7 @@ Docket runs on Docket.
     * [Issues and Tickets](#issues-and-tickets)
     * [Getting Set Up](#getting-set-up)
     * [Code Style](#code-style)
+        * [API Docs](#api-docs)
     * [Naming Across Interfaces](#naming-across-interfaces)
     * [Versioning](#versioning)
     * [Tests](#tests)
@@ -65,7 +66,7 @@ Match the surrounding code exactly:
 - **camelCase** for functions, variables, and parameters, never snake_case.
 - **`# MARK:` section headers** in every module: `Imports`, `Constants`, `Functions`, `Classes`, in that order.
 - **Module docstrings**: title line, blank line, one line description.
-- **Function docstrings**: description, blank line, `paramName: description.` lines, then a `Returns ...` sentence. No Sphinx or Google style. Backticks around code references.
+- **Function docstrings**: Google Style, with `Args:`, `Returns:`, and `Raises:` sections as needed. Backticks around code references.
 - **A short imperative comment above nearly every logical block.** "Stash the changes", not a paragraph.
 - **Full type hints everywhere.** `Optional[X]` and `Union[X, Y]` from `typing`, builtin generics like `list[str]`.
 - **Private helpers** are prefixed `_name` or `__name`.
@@ -75,6 +76,18 @@ Match the surrounding code exactly:
 
 Scripts under `scripts/` are standalone and import nothing from `docket`.
 Keep them that way.
+
+### API Docs
+
+The docstrings render into browsable API docs with [pdoc](https://pdoc.dev).
+They are for contributors only, are never hosted, and are git ignored.
+
+```bash
+uv run pdoc -d google docket                   # live server with reload
+uv run pdoc -d google -o docs/pdoc docket      # static HTML into docs/pdoc/
+```
+
+The `Build API Docs` VS Code task runs the static build.
 
 ## Naming Across Interfaces
 

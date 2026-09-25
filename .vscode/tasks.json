@@ -8,6 +8,12 @@
             "type": "shell",
             "command": "docket graph todo -o .\\graph.mmd; docket docs roadmap todo",
             "problemMatcher": []
+        },
+        {
+            "label": "Build API Docs",
+            "type": "shell",
+            "command": "uv run pdoc -d google -o docs/pdoc docket",
+            "problemMatcher": []
         }
     ]
 }

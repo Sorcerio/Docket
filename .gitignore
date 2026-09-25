@@ -19,6 +19,7 @@ wheels/
 .claude/skills/video-planner/
 .videos/
 graph.mmd
+docs/pdoc/
 scripts/*.ps1
 scripts/*.cmd
 
