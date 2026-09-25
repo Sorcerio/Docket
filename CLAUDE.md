@@ -58,6 +58,16 @@ TOML config keys stay camelCase, matching the repo style.
 
 Keep the snake_case-to-camelCase mapping explicit in `server.py`. Neither convention leaks into the other.
 
+## Frontmatter accessors
+
+Every ticket frontmatter field has a CLI accessor that prints its bare value for a pipe (`docket <ID> title`, `docket <ID> requires`, and so on). Any new frontmatter field gets one in the same change, never as follow-up work.
+
+- Register the command and its help in `ACCESSORS`, and map the field to it in `FIELD_ACCESSORS`, both in `src/docket/cli/grammar.py`.
+- Give it a reader in `FIELD_READERS` in `src/docket/cli/commands.py`. A list of ids prints one per line, and structured values print as JSON through `Output.json`.
+- Add it to the accessor block in `README.md`.
+
+`testEveryFrontmatterFieldHasAnAccessor` fails when `CANONICAL_FIELDS` gains a field that `FIELD_ACCESSORS` does not name.
+
 ## Commits
 
 - Plain messages only. Do NOT add a `Co-Authored-By` or `Generated with` trailer unless explicitly asked.

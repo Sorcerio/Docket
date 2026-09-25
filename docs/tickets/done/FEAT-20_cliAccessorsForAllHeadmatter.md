@@ -1,7 +1,7 @@
 ---
 id: FEAT-20
 title: CLI Accessors for All Headmatter
-status: todo
+status: done
 priority: 0
 requires: []
 metadata: {}

@@ -8,7 +8,7 @@ Everything the CLI prints, and the styling decisions behind it.
 
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Iterable, Optional
 
 from rich.console import Console
 from rich.table import Table
@@ -62,6 +62,46 @@ class Output:
         """
 
         sys.stdout.write(text)
+
+    def lines(self, entries: Iterable[object]) -> None:
+        """
+        Write each entry raw on its own line.
+
+        A list read by a shell is most useful one entry per line, since that is what `while read`, `xargs`, and `wc -l` all expect. An empty list writes nothing at all.
+
+        Args:
+            entries: The entries to write.
+        """
+
+        self.raw("".join(f"{entry}\n" for entry in entries))
+
+    def json(self, data: Any) -> None:
+        """
+        Write structured data as JSON.
+
+        `rich` highlights it for a terminal and falls back to plain text when stdout is a pipe or a file, so the same call serves a person and `jq` alike. It also never wraps, so a long value is not split across lines. A value JSON has no form for, such as a date `pyyaml` parsed, is written as its text rather than refused.
+
+        Args:
+            data: The data to write.
+        """
+
+        self.console.print_json(data=data, default=str)
+
+    def value(self, value: Any) -> None:
+        """
+        Write one value for a pipe, bare when it is plain and as JSON when it has structure.
+
+        A string or a number is written exactly as it reads, with no quoting. A mapping, a list, a boolean, or a null goes out as JSON, since its own text would be Python's spelling rather than anything a shell could parse.
+
+        Args:
+            value: The value to write.
+        """
+
+        if value is None or isinstance(value, (dict, list, tuple, bool)):
+            self.json(value)
+            return
+
+        self.raw(f"{value}\n")
 
     def warn(self, message: str) -> None:
         """

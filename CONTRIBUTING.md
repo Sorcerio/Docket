@@ -14,6 +14,7 @@ Docket runs on Docket.
     * [Code Style](#code-style)
         * [API Docs](#api-docs)
     * [Naming Across Interfaces](#naming-across-interfaces)
+    * [Frontmatter Fields](#frontmatter-fields)
     * [Versioning](#versioning)
     * [Tests](#tests)
     * [Opening a Pull Request](#opening-a-pull-request)
@@ -102,6 +103,14 @@ Two external interfaces deliberately break camelCase, and neither convention lea
 
 snake_case is the MCP ecosystem convention and it is what the model reads, so a camelCase tool name or parameter is a bug.
 The mapping lives explicitly in `server.py`.
+
+## Frontmatter Fields
+
+Every ticket frontmatter field is readable from the CLI as a bare value, for a pipe (`docket CORE-14 title`, `docket CORE-14 requires`, and so on).
+A new field is not finished until it has one.
+
+Add it to `ACCESSORS` and `FIELD_ACCESSORS` in `src/docket/cli/grammar.py`, and give it a reader in `FIELD_READERS` in `src/docket/cli/commands.py`.
+`testEveryFrontmatterFieldHasAnAccessor` fails until all three agree with `CANONICAL_FIELDS`, and the README's accessor block lists the new command.
 
 ## Versioning
 
