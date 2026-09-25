@@ -45,13 +45,13 @@ CLEAR_SENTINEL: str = "none"
 
 # The commands that print one thing about a ticket and nothing else, for a pipe to read, each with its help text. The name is the subcommand that reaches it and the key `commands` looks its reader up by, so this one table is the whole vocabulary of reads.
 ACCESSORS: dict[str, str] = {
-    "title": "Print the ticket's title and nothing else, for a pipe to read.",
-    "status": "Print the ticket's status and nothing else, for a pipe to read.",
-    "priority": "Print the ticket's priority and nothing else, for a pipe to read.",
-    "requires": "Print the ids this ticket depends on, one per line, for a pipe to read. Prints nothing when there are none.",
-    "required-by": "Print the ids of the tickets depending on this one, one per line, for a pipe to read. Prints nothing when there are none.",
-    "key": "Print the key portion of the ticket's id and nothing else, for a pipe to read.",
-    "ready": "Print whether every dependency is done, as a bare true or false, for a pipe to read.",
+    "title": "Print the ticket's title.",
+    "status": "Print the ticket's status.",
+    "priority": "Print the ticket's priority.",
+    "requires": "Print the ids this ticket depends on, one per line. Prints nothing when there are none.",
+    "required-by": "Print the ids of the tickets depending on this one, one per line. Prints nothing when there are none.",
+    "key": "Print the key portion of the ticket's id and nothing else.",
+    "ready": "Print whether every dependency is done, as a bare true or false.",
 }
 
 # The command that reads each frontmatter field. `id` has none, since it is what was typed to reach the ticket, and `metadata` is read through `meta` because that command also writes it. A field missing from here fails the suite, which is what keeps a new field from arriving without a way to read it.
