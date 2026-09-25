@@ -104,7 +104,8 @@ class Ticket:
 
         The explicit ordering is the whole mechanism, since dumping with sorting disabled follows insertion order.
 
-        Returns the ordered mapping.
+        Returns:
+            The ordered mapping.
         """
 
         # Place the recognized fields first, in the documented order.
@@ -127,7 +128,8 @@ class Ticket:
         """
         Build the summary form used by listings, which never carries the body.
 
-        Returns the summary mapping.
+        Returns:
+            The summary mapping.
         """
 
         return {
@@ -146,10 +148,12 @@ def _representFlowList(dumper: yaml.SafeDumper, data: FlowList) -> yaml.Node:
     """
     Represent a `FlowList` as an inline YAML sequence.
 
-    dumper: The active dumper.
-    data: The list being represented.
+    Args:
+        dumper: The active dumper.
+        data: The list being represented.
 
-    Returns the sequence node.
+    Returns:
+        The sequence node.
     """
 
     return dumper.represent_sequence("tag:yaml.org,2002:seq", list(data), flow_style=True)
@@ -164,9 +168,14 @@ def requireKnownStatus(status: str) -> str:
 
     The vocabulary is closed, so every surface that accepts a status has the same check to make. It lives here beside the vocabulary itself rather than at each surface, the same way `requireKnownKey` sits beside the registry.
 
-    status: The status to check.
+    Args:
+        status: The status to check.
 
-    Returns the same status.
+    Returns:
+        The same status.
+
+    Raises:
+        InvalidStatusError: Status '{status}' is not one of {', '.join(STATUSES)}.
     """
 
     if status not in STATUSES:
@@ -181,9 +190,14 @@ def splitFrontmatter(text: str) -> tuple[str, str]:
 
     The body is returned verbatim, including the blank line that conventionally follows the closing delimiter, so a round-trip reproduces the file exactly.
 
-    text: The full file text, with newlines already normalized to `\\n`.
+    Args:
+        text: The full file text, with newlines already normalized to `\\n`.
 
-    Returns a `(frontmatterText, body)` pair.
+    Returns:
+        A `(frontmatterText, body)` pair.
+
+    Raises:
+        TicketParseError: The frontmatter block is missing or malformed.
     """
 
     lines: list[str] = text.split("\n")
@@ -206,10 +220,15 @@ def parseTicket(text: str, path: Optional[Path] = None) -> Ticket:
 
     Structural problems raise here. Rule violations such as an out-of-range priority or an unrecognized status do not, because reporting those is `validate`'s job and it needs the ticket loaded to do it.
 
-    text: The full file text.
-    path: Where the text came from, recorded on the result.
+    Args:
+        text: The full file text.
+        path: Where the text came from, recorded on the result.
 
-    Returns the parsed `Ticket`.
+    Returns:
+        The parsed `Ticket`.
+
+    Raises:
+        TicketParseError: Frontmatter is not valid YAML: {error}
     """
 
     # Normalize line endings so a CRLF checkout parses identically to an LF one. Files are always written back as LF.
@@ -246,9 +265,11 @@ def serializeTicket(ticket: Ticket) -> str:
     """
     Serialize a `Ticket` back to markdown.
 
-    ticket: The ticket to serialize.
+    Args:
+        ticket: The ticket to serialize.
 
-    Returns the full file text, with `\\n` newlines.
+    Returns:
+        The full file text, with `\\n` newlines.
     """
 
     # Sorting must stay off, since the explicit field order in the mapping is what keeps diffs clean.
@@ -270,10 +291,12 @@ def buildBody(title: str, body: Optional[str] = None) -> str:
 
     The file always leads with an H1, because that is the shape the format documents. A supplied body that already opens with its own H1 is used as-is, so a caller writing a complete document does not end up with two headings.
 
-    title: The ticket title, used for the heading when one is needed.
-    body: The prose to place under the heading, if any.
+    Args:
+        title: The ticket title, used for the heading when one is needed.
+        body: The prose to place under the heading, if any.
 
-    Returns the body text, including the leading blank line that follows the closing frontmatter delimiter.
+    Returns:
+        The body text, including the leading blank line that follows the closing frontmatter delimiter.
     """
 
     # Trim surrounding blank lines so spacing is decided here rather than by the caller.

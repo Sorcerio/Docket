@@ -19,13 +19,15 @@ def readString(mapping: Mapping[str, Any], name: str, errorType: Type[DocketErro
     """
     Read a string field.
 
-    mapping: The parsed mapping to read from.
-    name: The field name.
-    errorType: The exception raised when the field is absent or of the wrong type.
-    source: What to name in the error message, for example `Frontmatter`.
-    fallback: The value used when the field is absent, or `None` to make the field required.
+    Args:
+        mapping: The parsed mapping to read from.
+        name: The field name.
+        errorType: The exception raised when the field is absent or of the wrong type.
+        source: What to name in the error message, for example `Frontmatter`.
+        fallback: The value used when the field is absent, or `None` to make the field required.
 
-    Returns the field value.
+    Returns:
+        The field value.
     """
 
     value: Any = _readRaw(mapping, name, errorType, source, fallback)
@@ -41,13 +43,15 @@ def readInt(mapping: Mapping[str, Any], name: str, errorType: Type[DocketError],
     """
     Read an integer field.
 
-    mapping: The parsed mapping to read from.
-    name: The field name.
-    errorType: The exception raised when the field is absent or of the wrong type.
-    source: What to name in the error message, for example `Frontmatter`.
-    fallback: The value used when the field is absent, or `None` to make the field required.
+    Args:
+        mapping: The parsed mapping to read from.
+        name: The field name.
+        errorType: The exception raised when the field is absent or of the wrong type.
+        source: What to name in the error message, for example `Frontmatter`.
+        fallback: The value used when the field is absent, or `None` to make the field required.
 
-    Returns the field value.
+    Returns:
+        The field value.
     """
 
     value: Any = _readRaw(mapping, name, errorType, source, fallback)
@@ -66,13 +70,15 @@ def readFloat(mapping: Mapping[str, Any], name: str, errorType: Type[DocketError
 
     An integer is accepted and widened, since a configuration writing `5` rather than `5.0` means the same thing and refusing it would be pedantic.
 
-    mapping: The parsed mapping to read from.
-    name: The field name.
-    errorType: The exception raised when the field is absent or of the wrong type.
-    source: What to name in the error message, for example `Configuration`.
-    fallback: The value used when the field is absent, or `None` to make the field required.
+    Args:
+        mapping: The parsed mapping to read from.
+        name: The field name.
+        errorType: The exception raised when the field is absent or of the wrong type.
+        source: What to name in the error message, for example `Configuration`.
+        fallback: The value used when the field is absent, or `None` to make the field required.
 
-    Returns the field value.
+    Returns:
+        The field value.
     """
 
     value: Any = _readRaw(mapping, name, errorType, source, fallback)
@@ -91,12 +97,14 @@ def readStringList(mapping: Mapping[str, Any], name: str, errorType: Type[Docket
 
     An absent or null field reads as empty, since an empty list is the common case and refusing to load over it would be hostile.
 
-    mapping: The parsed mapping to read from.
-    name: The field name.
-    errorType: The exception raised when the field is of the wrong type.
-    source: What to name in the error message, for example `Frontmatter`.
+    Args:
+        mapping: The parsed mapping to read from.
+        name: The field name.
+        errorType: The exception raised when the field is of the wrong type.
+        source: What to name in the error message, for example `Frontmatter`.
 
-    Returns the field value.
+    Returns:
+        The field value.
     """
 
     if name not in mapping or mapping[name] is None:
@@ -121,12 +129,14 @@ def readDict(mapping: Mapping[str, Any], name: str, errorType: Type[DocketError]
 
     An absent or null field reads as empty, for the same reason as `readStringList`.
 
-    mapping: The parsed mapping to read from.
-    name: The field name.
-    errorType: The exception raised when the field is of the wrong type.
-    source: What to name in the error message, for example `Frontmatter`.
+    Args:
+        mapping: The parsed mapping to read from.
+        name: The field name.
+        errorType: The exception raised when the field is of the wrong type.
+        source: What to name in the error message, for example `Frontmatter`.
 
-    Returns the field value.
+    Returns:
+        The field value.
     """
 
     if name not in mapping or mapping[name] is None:
@@ -148,13 +158,15 @@ def _readRaw(mapping: Mapping[str, Any], name: str, errorType: Type[DocketError]
     """
     Fetch a field, applying its fallback or raising when it is required and absent.
 
-    mapping: The parsed mapping to read from.
-    name: The field name.
-    errorType: The exception raised when a required field is absent.
-    source: What to name in the error message.
-    fallback: The value used when the field is absent, or `None` to make the field required.
+    Args:
+        mapping: The parsed mapping to read from.
+        name: The field name.
+        errorType: The exception raised when a required field is absent.
+        source: What to name in the error message.
+        fallback: The value used when the field is absent, or `None` to make the field required.
 
-    Returns the raw value, still untyped.
+    Returns:
+        The raw value, still untyped.
     """
 
     if name in mapping:

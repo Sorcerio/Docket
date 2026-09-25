@@ -37,11 +37,13 @@ def commandTicket(args: argparse.Namespace, store: Store, output: Output) -> int
 
     A bare id shows the ticket, since showing it is what naming one almost always means.
 
-    args: The parsed arguments.
-    store: The store to read from or write through.
-    output: Where to write.
+    Args:
+        args: The parsed arguments.
+        store: The store to read from or write through.
+        output: Where to write.
 
-    Returns the process exit code.
+    Returns:
+        The process exit code.
     """
 
     # A status word is not a command carrying a value, it is the whole instruction.
@@ -64,11 +66,13 @@ def commandNew(args: argparse.Namespace, store: Store, output: Output) -> int:
     """
     Create a ticket.
 
-    args: The parsed arguments.
-    store: The store to write through.
-    output: Where to write.
+    Args:
+        args: The parsed arguments.
+        store: The store to write through.
+        output: Where to write.
 
-    Returns the process exit code.
+    Returns:
+        The process exit code.
     """
 
     result: TicketResult = store.create(
@@ -94,11 +98,13 @@ def commandShow(args: argparse.Namespace, store: Store, output: Output) -> int:
 
     The raw file carries bare ids in one direction only, so this resolves the titles and statuses the file deliberately does not duplicate. Use `cat` for the raw file.
 
-    args: The parsed arguments.
-    store: The store to read from.
-    output: Where to write.
+    Args:
+        args: The parsed arguments.
+        store: The store to read from.
+        output: Where to write.
 
-    Returns the process exit code.
+    Returns:
+        The process exit code.
     """
 
     loaded: TicketSet = store.loadAll()
@@ -124,11 +130,13 @@ def commandList(args: argparse.Namespace, store: Store, output: Output) -> int:
     """
     List ticket summaries.
 
-    args: The parsed arguments.
-    store: The store to read from.
-    output: Where to write.
+    Args:
+        args: The parsed arguments.
+        store: The store to read from.
+        output: Where to write.
 
-    Returns the process exit code.
+    Returns:
+        The process exit code.
     """
 
     status, key, priorityMax = resolveListFilters(args.filters, args.status, args.key, args.priorityMax)
@@ -166,11 +174,13 @@ def commandSet(args: argparse.Namespace, store: Store, output: Output) -> int:
     """
     Change a ticket's title, priority, or dependencies.
 
-    args: The parsed arguments.
-    store: The store to write through.
-    output: Where to write.
+    Args:
+        args: The parsed arguments.
+        store: The store to write through.
+        output: Where to write.
 
-    Returns the process exit code.
+    Returns:
+        The process exit code.
     """
 
     # Nothing to do is a usage error rather than a silent success, since the caller clearly meant to change something.
@@ -199,11 +209,13 @@ def commandStatus(args: argparse.Namespace, store: Store, output: Output) -> int
     """
     Change a ticket's status, moving its file in the same operation.
 
-    args: The parsed arguments.
-    store: The store to write through.
-    output: Where to write.
+    Args:
+        args: The parsed arguments.
+        store: The store to write through.
+        output: Where to write.
 
-    Returns the process exit code.
+    Returns:
+        The process exit code.
     """
 
     # The command that was typed is the status, since each status is its own command rather than a value handed to a shared one.
@@ -220,11 +232,13 @@ def commandStatusRead(args: argparse.Namespace, store: Store, output: Output) ->
 
     This goes out raw, with no styling and no surrounding words, so a shell can read the answer as easily as a person can.
 
-    args: The parsed arguments.
-    store: The store to read from.
-    output: Where to write.
+    Args:
+        args: The parsed arguments.
+        store: The store to read from.
+        output: Where to write.
 
-    Returns the process exit code.
+    Returns:
+        The process exit code.
     """
 
     ticket: Ticket = store.load(args.id)
@@ -240,11 +254,13 @@ def commandReady(args: argparse.Namespace, store: Store, output: Output) -> int:
 
     This goes out raw for the same reason `status` does. What is blocking is deliberately left to `show`, which already tables both dependency directions with their statuses.
 
-    args: The parsed arguments.
-    store: The store to read from.
-    output: Where to write.
+    Args:
+        args: The parsed arguments.
+        store: The store to read from.
+        output: Where to write.
 
-    Returns the process exit code, which reports whether the question could be answered rather than what the answer was.
+    Returns:
+        The process exit code, which reports whether the question could be answered rather than what the answer was.
     """
 
     readiness: Readiness = ticketReadiness(store.loadAll(), args.id)
@@ -260,11 +276,13 @@ def commandMeta(args: argparse.Namespace, store: Store, output: Output) -> int:
 
     How much of the call was typed is what it means. No key reads the whole map, a key alone reads that one entry, and a key with a value writes it, which is the same shape a status has.
 
-    args: The parsed arguments.
-    store: The store to read from or write through.
-    output: Where to write.
+    Args:
+        args: The parsed arguments.
+        store: The store to read from or write through.
+        output: Where to write.
 
-    Returns the process exit code.
+    Returns:
+        The process exit code.
     """
 
     if args.key is None:
@@ -321,11 +339,13 @@ def commandGraph(args: argparse.Namespace, store: Store, output: Output) -> int:
     """
     Render the dependency graph as mermaid source.
 
-    args: The parsed arguments.
-    store: The store to read from.
-    output: Where to write.
+    Args:
+        args: The parsed arguments.
+        store: The store to read from.
+        output: Where to write.
 
-    Returns the process exit code.
+    Returns:
+        The process exit code.
     """
 
     ticketId, key, status = resolveGraphScope(args.scope, args.id, args.key, args.status)
@@ -343,11 +363,13 @@ def commandKey(args: argparse.Namespace, store: Store, output: Output) -> int:
     """
     Inspect and manage the key registry.
 
-    args: The parsed arguments.
-    store: The store, which also reports which keys are in use.
-    output: Where to write.
+    Args:
+        args: The parsed arguments.
+        store: The store, which also reports which keys are in use.
+        output: Where to write.
 
-    Returns the process exit code.
+    Returns:
+        The process exit code.
     """
 
     config: Config = store.config
@@ -389,11 +411,13 @@ def commandValidate(args: argparse.Namespace, store: Store, output: Output) -> i
     """
     Run every integrity rule.
 
-    args: The parsed arguments.
-    store: The store to validate.
-    output: Where to write.
+    Args:
+        args: The parsed arguments.
+        store: The store to validate.
+        output: Where to write.
 
-    Returns the process exit code, non-zero when errors were found.
+    Returns:
+        The process exit code, non-zero when errors were found.
     """
 
     report: ValidationReport = validate(store)
@@ -419,8 +443,9 @@ def requireScopeKey(store: Store, key: Optional[str]) -> None:
 
     Scoping to an unknown key would draw an empty graph, which reads as an answer rather than as the typo it is. `list` refuses one for the same reason. A status needs no equivalent check, since the vocabulary is fixed and both spellings are checked against it before they arrive here, so an empty result there is a true answer.
 
-    store: The store holding the registry.
-    key: The key the scope named, or `None` when it named something else.
+    Args:
+        store: The store holding the registry.
+        key: The key the scope named, or `None` when it named something else.
     """
 
     if key is not None:
@@ -433,10 +458,12 @@ def documentPath(config: Optional[Config], filename: str) -> Path:
 
     A document belongs to the repository it describes, so it lands beside the configuration that governs it. Run outside a repository there is no such place, and the working directory is the only honest fallback, which is the same reasoning that lets the brief render without a configuration at all.
 
-    config: The configuration governing the document, or `None` when none was found.
-    filename: What the document is called.
+    Args:
+        config: The configuration governing the document, or `None` when none was found.
+        filename: What the document is called.
 
-    Returns the path to write to unless the caller names another.
+    Returns:
+        The path to write to unless the caller names another.
     """
 
     return (config.repoRoot if config is not None else Path.cwd()) / filename
@@ -450,15 +477,17 @@ def emitDocument(text: str, destination: Optional[str], name: str, output: Outpu
 
     A named destination always wins. Without one, the prescribed path is written unless printing was asked for instead, and asking for both does both.
 
-    text: The rendered text to emit.
-    destination: The path the caller named, or `None` when none was named.
-    name: What to name the destination in an error message, for example `--output path`.
-    output: Where to write.
-    defaultPath: The path to write when none was named, or `None` to leave stdout as the only destination.
-    toPrint: Whether to print the text to stdout.
-    note: Anything to append to the confirmation line, already spaced and parenthesized.
+    Args:
+        text: The rendered text to emit.
+        destination: The path the caller named, or `None` when none was named.
+        name: What to name the destination in an error message, for example `--output path`.
+        output: Where to write.
+        defaultPath: The path to write when none was named, or `None` to leave stdout as the only destination.
+        toPrint: Whether to print the text to stdout.
+        note: Anything to append to the confirmation line, already spaced and parenthesized.
 
-    Returns the process exit code.
+    Returns:
+        The process exit code.
     """
 
     chosen: Optional[str] = destination
@@ -483,11 +512,13 @@ def commandDocs(args: argparse.Namespace, config: Optional[Config], output: Outp
     """
     Write a document docket ships, rendered for this repository.
 
-    args: The parsed arguments.
-    config: The configuration governing the current directory, or `None` when none was found.
-    output: Where to write.
+    Args:
+        args: The parsed arguments.
+        config: The configuration governing the current directory, or `None` when none was found.
+        output: Where to write.
 
-    Returns the process exit code.
+    Returns:
+        The process exit code.
     """
 
     if args.docsCommand == "handoff":
@@ -509,11 +540,13 @@ def commandRoadmap(args: argparse.Namespace, store: Store, output: Output) -> in
     """
     Write the dependency graph as a markdown document with an embedded mermaid diagram.
 
-    args: The parsed arguments.
-    store: The store to read from.
-    output: Where to write.
+    Args:
+        args: The parsed arguments.
+        store: The store to read from.
+        output: Where to write.
 
-    Returns the process exit code.
+    Returns:
+        The process exit code.
     """
 
     ticketId, key, status = resolveGraphScope(args.scope, args.id, args.key, args.status)
@@ -535,10 +568,12 @@ def commandDeploy(args: argparse.Namespace, output: Output) -> int:
     """
     Install docket into a repository, or refresh what is already deployed there.
 
-    args: The parsed arguments.
-    output: Where to write.
+    Args:
+        args: The parsed arguments.
+        output: Where to write.
 
-    Returns the process exit code.
+    Returns:
+        The process exit code.
     """
 
     target: Path = Path(args.path)

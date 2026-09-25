@@ -87,9 +87,11 @@ class TicketSet:
         """
         Report whether an id is present.
 
-        ticketId: The id to test.
+        Args:
+            ticketId: The id to test.
 
-        Returns `True` when a ticket carries the id.
+        Returns:
+            `True` when a ticket carries the id.
         """
 
         return ticketId in self.tickets
@@ -98,7 +100,8 @@ class TicketSet:
         """
         Iterate every loaded ticket in sorted order.
 
-        Returns an iterator over tickets.
+        Returns:
+            An iterator over tickets.
         """
 
         return iter(self.sorted())
@@ -107,7 +110,8 @@ class TicketSet:
         """
         Count the loaded tickets.
 
-        Returns the ticket count.
+        Returns:
+            The ticket count.
         """
 
         return len(self.tickets)
@@ -118,9 +122,14 @@ class TicketSet:
         """
         Fetch one ticket by id.
 
-        ticketId: The id to look up.
+        Args:
+            ticketId: The id to look up.
 
-        Returns the ticket.
+        Returns:
+            The ticket.
+
+        Raises:
+            TicketNotFoundError: No ticket with id '{ticketId}'.
         """
 
         if ticketId not in self.tickets:
@@ -132,7 +141,8 @@ class TicketSet:
         """
         List every loaded id.
 
-        Returns the ids, unsorted.
+        Returns:
+            The ids, unsorted.
         """
 
         return list(self.tickets)
@@ -143,7 +153,8 @@ class TicketSet:
 
         The number is compared numerically rather than as text, so `CORE-2` precedes `CORE-10`.
 
-        Returns the ordered tickets.
+        Returns:
+            The ordered tickets.
         """
 
         return sorted(self.tickets.values(), key=_sortKey)
@@ -152,11 +163,13 @@ class TicketSet:
         """
         Select tickets matching every supplied filter, in sorted order.
 
-        status: Keep only tickets with this status.
-        key: Keep only tickets carrying this key.
-        priorityMax: Keep only tickets at or below this priority number, meaning at or above this urgency.
+        Args:
+            status: Keep only tickets with this status.
+            key: Keep only tickets carrying this key.
+            priorityMax: Keep only tickets at or below this priority number, meaning at or above this urgency.
 
-        Returns the matching tickets.
+        Returns:
+            The matching tickets.
         """
 
         matches: list[Ticket] = self.sorted()
@@ -183,7 +196,8 @@ class Store:
         """
         Bind a store to a configuration.
 
-        config: The configuration naming the ticket root and the status directories.
+        Args:
+            config: The configuration naming the ticket root and the status directories.
         """
 
         self.config: Config = config
@@ -196,9 +210,11 @@ class Store:
 
         `done` is the only status that moves a file, so everything else shares the todo directory. That rule is what keeps the vocabulary fixed rather than configurable.
 
-        status: The status to resolve.
+        Args:
+            status: The status to resolve.
 
-        Returns the absolute directory path.
+        Returns:
+            The absolute directory path.
         """
 
         return self.config.donePath if status == STATUS_DONE else self.config.todoPath
@@ -209,9 +225,11 @@ class Store:
 
         Filenames are frozen at creation, so an already-written ticket keeps its existing filename even after a retitle. Only the directory follows the status.
 
-        ticket: The ticket to place.
+        Args:
+            ticket: The ticket to place.
 
-        Returns the absolute file path.
+        Returns:
+            The absolute file path.
         """
 
         # Reuse the existing filename when there is one, since retitling must not rename the file.
@@ -223,7 +241,8 @@ class Store:
         """
         List every candidate ticket file under both status directories.
 
-        Returns the paths, sorted so results are deterministic across platforms.
+        Returns:
+            The paths, sorted so results are deterministic across platforms.
         """
 
         paths: list[Path] = []
@@ -239,7 +258,8 @@ class Store:
         """
         Load every ticket under the configured root, holding the repository's read lock while doing so.
 
-        Returns the loaded `TicketSet`.
+        Returns:
+            The loaded `TicketSet`.
         """
 
         # A caller already inside a write lock must not come through here, since the lock refuses to downgrade from writing to reading. Those callers use the unlocked form directly.
@@ -250,9 +270,11 @@ class Store:
         """
         Load one ticket by id.
 
-        ticketId: The id to look up.
+        Args:
+            ticketId: The id to look up.
 
-        Returns the ticket.
+        Returns:
+            The ticket.
         """
 
         return self.loadAll().get(ticketId)
@@ -263,9 +285,11 @@ class Store:
 
         This does not move an existing file. `setStatus` owns that, so no caller can change a status without the move happening in the same operation.
 
-        ticket: The ticket to write.
+        Args:
+            ticket: The ticket to write.
 
-        Returns the ticket with its path recorded.
+        Returns:
+            The ticket with its path recorded.
         """
 
         path: Path = self.pathFor(ticket)
@@ -292,13 +316,15 @@ class Store:
 
         The id is derived by scanning what already exists, so the scan and the write are held together under one lock. Without that, two processes minting under one key read the same set and allocate the same number.
 
-        key: The key to mint under, which must be registered.
-        title: The ticket title, converted to title case before anything derives from it.
-        body: Prose for the body, placed under a heading built from the title.
-        requires: Ids this ticket depends on.
-        priority: The priority, defaulting to the configuration's `defaultPriority`.
+        Args:
+            key: The key to mint under, which must be registered.
+            title: The ticket title, converted to title case before anything derives from it.
+            body: Prose for the body, placed under a heading built from the title.
+            requires: Ids this ticket depends on.
+            priority: The priority, defaulting to the configuration's `defaultPriority`.
 
-        Returns the written ticket and any warnings.
+        Returns:
+            The written ticket and any warnings.
         """
 
         # The filename slug derives from the title once, here, so an empty one is frozen into the filename as well as the field.
@@ -346,14 +372,19 @@ class Store:
 
         The load and the write back are held together under one lock, since a second process changing a different field in the gap would have its change reverted by this write.
 
-        ticketId: The ticket to change.
-        title: A new title, converted to title case, if any.
-        priority: A new priority, if any.
-        requires: A replacement dependency list, if any.
-        requiresAdd: Ids to append to the existing list, if any.
-        requiresRemove: Ids to drop from the existing list, if any.
+        Args:
+            ticketId: The ticket to change.
+            title: A new title, converted to title case, if any.
+            priority: A new priority, if any.
+            requires: A replacement dependency list, if any.
+            requiresAdd: Ids to append to the existing list, if any.
+            requiresRemove: Ids to drop from the existing list, if any.
 
-        Returns the written ticket and any warnings.
+        Returns:
+            The written ticket and any warnings.
+
+        Raises:
+            ConflictingArgumentsError: A replacement dependency list cannot be combined with adding to or removing from the existing one. Pass either the replacement or the edits.
         """
 
         # Replacing the list and editing it in place at once names no order the caller actually asked for.
@@ -395,11 +426,13 @@ class Store:
 
         The whole file is rewritten to change the one entry, so the load and the write back are held together under one lock. Two consumers namespacing their keys correctly would still lose one of the two without it.
 
-        ticketId: The ticket to change.
-        key: The metadata key, which cannot be empty.
-        value: The value to store, or `None` to remove the key.
+        Args:
+            ticketId: The ticket to change.
+            key: The metadata key, which cannot be empty.
+            value: The value to store, or `None` to remove the key.
 
-        Returns the written ticket and any warnings.
+        Returns:
+            The written ticket and any warnings.
         """
 
         requireText(key, "metadata key")
@@ -423,10 +456,12 @@ class Store:
 
         The move is a write followed by a delete, which is two steps no matter how each one is performed, so the lock is what stops a reader from seeing both files at once and reporting a duplicate id.
 
-        ticketId: The ticket to change.
-        status: The new status.
+        Args:
+            ticketId: The ticket to change.
+            status: The new status.
 
-        Returns the updated ticket.
+        Returns:
+            The updated ticket.
         """
 
         # Reject an unrecognized status at the boundary rather than writing it and leaving `validate` to find it later.
@@ -451,7 +486,8 @@ class Store:
 
         This is what `key reject` needs in order to refuse loudly and name the tickets standing in the way.
 
-        Returns keys mapped to their ticket ids.
+        Returns:
+            Keys mapped to their ticket ids.
         """
 
         used: dict[str, list[str]] = {}
@@ -470,7 +506,8 @@ class Store:
 
         This exists because the lock refuses to downgrade from writing to reading, so a mutator already holding the write lock cannot call `loadAll`. Every caller of this is either inside a write lock or is `loadAll` itself.
 
-        Returns the loaded `TicketSet`.
+        Returns:
+            The loaded `TicketSet`.
         """
 
         result: TicketSet = TicketSet()
@@ -496,7 +533,11 @@ class Store:
         """
         Reject a priority outside the configured band.
 
-        priority: The priority to check.
+        Args:
+            priority: The priority to check.
+
+        Raises:
+            InvalidPriorityError: Priority {priority} is outside 0 through {self.config.maxPriority}. 0 is most urgent.
         """
 
         if not 0 <= priority <= self.config.maxPriority:
@@ -508,10 +549,12 @@ class Store:
 
         This is a warning rather than an error, so an agent writing a batch out of order completes the batch. `validate` reports the same condition as an error once the batch is done.
 
-        ticket: The ticket whose dependencies are being checked.
-        existing: The set loaded before the write.
+        Args:
+            ticket: The ticket whose dependencies are being checked.
+            existing: The set loaded before the write.
 
-        Returns one warning per unknown id.
+        Returns:
+            One warning per unknown id.
         """
 
         # The ticket may legitimately require something written earlier in this same batch, so check against the set loaded before the write.
@@ -527,9 +570,11 @@ def _sortKey(ticket: Ticket) -> tuple[int, str, int]:
 
     The id's number is compared numerically rather than as text, so `CORE-2` precedes `CORE-10` instead of following it.
 
-    ticket: The ticket to order.
+    Args:
+        ticket: The ticket to order.
 
-    Returns a `(priority, key, number)` tuple.
+    Returns:
+        A `(priority, key, number)` tuple.
     """
 
     key, number = parseId(ticket.id)

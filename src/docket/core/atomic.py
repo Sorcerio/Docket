@@ -29,8 +29,9 @@ def writeTextAtomic(path: Path, text: str) -> None:
 
     Newlines are written as LF explicitly, matching what every direct write in this repository already did, so a checkout on Windows does not churn the file.
 
-    path: The file to replace. Its parent directory must already exist.
-    text: The full contents to write.
+    Args:
+        path: The file to replace. Its parent directory must already exist.
+        text: The full contents to write.
     """
 
     # Hold the temporary path outside the try, so cleanup can find it even when the write itself is what failed.

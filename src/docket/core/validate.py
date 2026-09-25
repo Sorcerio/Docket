@@ -63,7 +63,8 @@ class Finding:
         """
         Build the serializable form, used by the MCP surface.
 
-        Returns the finding as plain data.
+        Returns:
+            The finding as plain data.
         """
 
         return {
@@ -115,7 +116,8 @@ class ValidationReport:
         """
         Build the serializable form, used by the MCP surface.
 
-        Returns the report as plain data.
+        Returns:
+            The report as plain data.
         """
 
         return {
@@ -133,10 +135,12 @@ def validate(store: Store, ticketSet: Optional[TicketSet] = None) -> ValidationR
     """
     Run every rule against a ticket set.
 
-    store: The store naming the configuration and the ticket root.
-    ticketSet: An already-loaded set, loaded here when omitted.
+    Args:
+        store: The store naming the configuration and the ticket root.
+        ticketSet: An already-loaded set, loaded here when omitted.
 
-    Returns the report.
+    Returns:
+        The report.
     """
 
     loaded: TicketSet = ticketSet if ticketSet is not None else store.loadAll()
@@ -168,9 +172,11 @@ def _checkLoadFailures(ticketSet: TicketSet) -> list[Finding]:
     """
     Report files under a status directory that could not be read as tickets.
 
-    ticketSet: The loaded set.
+    Args:
+        ticketSet: The loaded set.
 
-    Returns the findings.
+    Returns:
+        The findings.
     """
 
     return [
@@ -185,9 +191,11 @@ def _checkDuplicateIds(ticketSet: TicketSet) -> list[Finding]:
 
     This is the collision two branches minting under the same key produce, and catching it here at merge time is the accepted cost of having no counter file.
 
-    ticketSet: The loaded set.
+    Args:
+        ticketSet: The loaded set.
 
-    Returns the findings.
+    Returns:
+        The findings.
     """
 
     return [
@@ -206,10 +214,12 @@ def _checkDependencies(ticket: Ticket, ticketSet: TicketSet) -> list[Finding]:
     """
     Report a `requires` entry naming an id that does not exist.
 
-    ticket: The ticket to check.
-    ticketSet: The loaded set to resolve against.
+    Args:
+        ticket: The ticket to check.
+        ticketSet: The loaded set to resolve against.
 
-    Returns the findings.
+    Returns:
+        The findings.
     """
 
     return [
@@ -229,10 +239,12 @@ def _checkKey(ticket: Ticket, config: Config) -> list[Finding]:
     """
     Report a ticket whose key is not registered.
 
-    ticket: The ticket to check.
-    config: The configuration holding the key registry.
+    Args:
+        ticket: The ticket to check.
+        config: The configuration holding the key registry.
 
-    Returns the findings.
+    Returns:
+        The findings.
     """
 
     if config.isRegisteredKey(ticket.key):
@@ -255,9 +267,11 @@ def _checkFilename(ticket: Ticket) -> list[Finding]:
 
     The slug is deliberately not checked, because filenames are frozen at creation and a retitle is expected to leave the slug stale.
 
-    ticket: The ticket to check.
+    Args:
+        ticket: The ticket to check.
 
-    Returns the findings.
+    Returns:
+        The findings.
     """
 
     if ticket.path is None:
@@ -285,10 +299,12 @@ def _checkStatusDirectory(ticket: Ticket, store: Store) -> list[Finding]:
 
     The status field is the truth and the directory is a projection of it, so this catches a file a human moved by hand.
 
-    ticket: The ticket to check.
-    store: The store resolving a status to its directory.
+    Args:
+        ticket: The ticket to check.
+        store: The store resolving a status to its directory.
 
-    Returns the findings.
+    Returns:
+        The findings.
     """
 
     if ticket.path is None:
@@ -317,10 +333,12 @@ def _checkPriority(ticket: Ticket, config: Config) -> list[Finding]:
     """
     Report a priority outside the configured band.
 
-    ticket: The ticket to check.
-    config: The configuration holding the ceiling.
+    Args:
+        ticket: The ticket to check.
+        config: The configuration holding the ceiling.
 
-    Returns the findings.
+    Returns:
+        The findings.
     """
 
     if 0 <= ticket.priority <= config.maxPriority:
@@ -341,9 +359,11 @@ def _checkStatus(ticket: Ticket) -> list[Finding]:
     """
     Report a status outside the fixed vocabulary.
 
-    ticket: The ticket to check.
+    Args:
+        ticket: The ticket to check.
 
-    Returns the findings.
+    Returns:
+        The findings.
     """
 
     if ticket.status in STATUSES:
@@ -368,9 +388,11 @@ def _checkTitleCase(ticket: Ticket) -> list[Finding]:
     Every write goes through the conversion, so what this catches is a file edited by hand and a ticket written before the rule existed.
     The corrected title travels in the message, which is what lets a human operator or an agent fix it without working out the convention first.
 
-    ticket: The ticket to check.
+    Args:
+        ticket: The ticket to check.
 
-    Returns the findings.
+    Returns:
+        The findings.
     """
 
     if isTitleCase(ticket.title):
@@ -391,9 +413,11 @@ def _checkCycles(graph: ResolvedGraph) -> list[Finding]:
     """
     Report every dependency cycle.
 
-    graph: The resolved graph to search.
+    Args:
+        graph: The resolved graph to search.
 
-    Returns the findings.
+    Returns:
+        The findings.
     """
 
     findings: list[Finding] = []

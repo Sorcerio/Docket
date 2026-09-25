@@ -26,7 +26,8 @@ def buildEnvironment() -> Environment:
 
     Autoescaping is off because the output is markdown a person reads, and escaping it would corrupt the very syntax a brief may be teaching. An undefined name raises rather than rendering as nothing, so a template naming something the context does not carry fails here instead of reaching the reader as a hole in a sentence.
 
-    Returns the environment.
+    Returns:
+        The environment.
     """
 
     return Environment(undefined=StrictUndefined, trim_blocks=True, lstrip_blocks=True, keep_trailing_newline=True, autoescape=False)
@@ -36,9 +37,11 @@ def readDocument(name: str) -> str:
     """
     Read a document shipped inside the package.
 
-    name: The document filename.
+    Args:
+        name: The document filename.
 
-    Returns the document text.
+    Returns:
+        The document text.
     """
 
     return readPackageText(DOCS_DIRECTORY, name)
@@ -50,10 +53,12 @@ def renderDocument(name: str, context: dict[str, object]) -> str:
 
     Reading and rendering are one step here because no caller has ever wanted one without the other, and keeping them together is what leaves each document's module holding only its own context.
 
-    name: The document filename.
-    context: The names the template renders against.
+    Args:
+        name: The document filename.
+        context: The names the template renders against.
 
-    Returns the rendered document.
+    Returns:
+        The rendered document.
     """
 
     template: Template = buildEnvironment().from_string(readDocument(name))

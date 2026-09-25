@@ -75,9 +75,10 @@ async def listTickets(status: Optional[str] = None, key: Optional[str] = None, p
 
     Returns id, title, status, priority, and key for each match. Never returns bodies, so listing many tickets stays cheap. Call `read_ticket` for the body of one.
 
-    status: Keep only tickets with this status. One of todo, wip, done.
-    key: Keep only tickets carrying this key.
-    priority_max: Keep only tickets at or below this priority number. 0 is most urgent.
+    Args:
+        status: Keep only tickets with this status. One of todo, wip, done.
+        key: Keep only tickets carrying this key.
+        priority_max: Keep only tickets at or below this priority number. 0 is most urgent.
     """
 
     store: Store = _store()
@@ -93,7 +94,8 @@ async def readTicket(id: str) -> str:
 
     The raw file stores bare ids in one direction only, so this adds what the file deliberately does not duplicate: the title and status of everything this ticket requires, and the whole reverse direction of everything that requires it. A dependency naming a ticket that does not exist is returned with `exists` false rather than being hidden.
 
-    id: The ticket id, for example CORE-14.
+    Args:
+        id: The ticket id, for example CORE-14.
     """
 
     store: Store = _store()
@@ -121,7 +123,8 @@ async def checkReady(id: str) -> str:
 
     A ticket that is itself done is never ready, because there is no work left to be ready for. That case returns an empty `blocked_by`, so an empty list alongside `ready` false means finished rather than unblocked.
 
-    id: The ticket id, for example CORE-14.
+    Args:
+        id: The ticket id, for example CORE-14.
     """
 
     store: Store = _store()
@@ -147,11 +150,12 @@ async def createTicket(
 
     A `requires` entry naming a ticket that does not exist yet is a warning rather than a failure, so a batch written out of order still completes. Call `validate` once the batch is done.
 
-    key: The key to mint under, for example CORE.
-    title: The ticket title, which cannot be empty. The filename derives from this once, at creation, and never changes afterwards.
-    body: Markdown prose for the body, placed under a heading built from the title.
-    requires: Ids this ticket depends on.
-    priority: 0 is most urgent. Defaults to the repository's configured default.
+    Args:
+        key: The key to mint under, for example CORE.
+        title: The ticket title, which cannot be empty. The filename derives from this once, at creation, and never changes afterwards.
+        body: Markdown prose for the body, placed under a heading built from the title.
+        requires: Ids this ticket depends on.
+        priority: 0 is most urgent. Defaults to the repository's configured default.
     """
 
     result: TicketResult = _store().create(key=key, title=title, body=body, requires=requires, priority=priority)
@@ -175,12 +179,13 @@ async def updateTicket(
 
     The dependency list is edited either wholesale or in place, never both in one call. Passing `requires` alongside `requires_add` or `requires_remove` is refused, since it asks for two contradictory things at once.
 
-    id: The ticket id.
-    title: A new title, which cannot be empty.
-    priority: A new priority. 0 is most urgent.
-    requires: A replacement dependency list. Pass an empty list to clear it.
-    requires_add: Ids to append to the existing list. One already there is not duplicated.
-    requires_remove: Ids to drop from the existing list. One that is not there is ignored.
+    Args:
+        id: The ticket id.
+        title: A new title, which cannot be empty.
+        priority: A new priority. 0 is most urgent.
+        requires: A replacement dependency list. Pass an empty list to clear it.
+        requires_add: Ids to append to the existing list. One already there is not duplicated.
+        requires_remove: Ids to drop from the existing list. One that is not there is ignored.
     """
 
     result: TicketResult = _store().update(ticketId=id, title=title, priority=priority, requires=requires, requiresAdd=requires_add, requiresRemove=requires_remove)
@@ -196,9 +201,10 @@ async def setMetadata(id: str, key: str, value: Optional[Any] = None) -> str:
 
     `metadata` is free-form, shared by whatever tools or skills want to attach data to a ticket. Namespace your key, for example `video`, so your entries never collide with another consumer's. Only the named key is touched, every other entry is left as it was.
 
-    id: The ticket id.
-    key: The metadata key, which cannot be empty.
-    value: The value to store, any JSON-compatible type. Omit or pass null to remove the key instead.
+    Args:
+        id: The ticket id.
+        key: The metadata key, which cannot be empty.
+        value: The value to store, any JSON-compatible type. Omit or pass null to remove the key instead.
     """
 
     result: TicketResult = _store().setMetadata(ticketId=id, key=key, value=value)
@@ -213,8 +219,9 @@ async def setStatus(id: str, status: str) -> str:
 
     Never move a ticket file by hand. The status field is the truth and the directory is a projection of it, and only this tool keeps the two in step.
 
-    id: The ticket id.
-    status: One of todo, wip, done. Only done moves the file into the done directory.
+    Args:
+        id: The ticket id.
+        status: One of todo, wip, done. Only done moves the file into the done directory.
     """
 
     ticket: Ticket = _store().setStatus(id, status)
@@ -229,9 +236,10 @@ async def graphTool(id: Optional[str] = None, key: Optional[str] = None, status:
 
     Arrows point from a dependency to what depends on it, so an arrow reads as "must happen before". With no argument the whole set is rendered.
 
-    id: Scope to one ticket's transitive ancestors and descendants.
-    key: Scope to one key, plus its immediate cross-key neighbors, which are marked so the boundary is visible.
-    status: Scope to the tickets with this status alone, one of todo, wip, done. Nothing outside it is borrowed, so an edge survives only when both of its ends carry the status.
+    Args:
+        id: Scope to one ticket's transitive ancestors and descendants.
+        key: Scope to one key, plus its immediate cross-key neighbors, which are marked so the boundary is visible.
+        status: Scope to the tickets with this status alone, one of todo, wip, done. Nothing outside it is borrowed, so an edge survives only when both of its ends carry the status.
     """
 
     store: Store = _store()
@@ -264,9 +272,10 @@ async def addKey(key: str, description: str, rationale: str) -> str:
 
     The key is written into the repository's configuration, where it shows up in the git diff.
 
-    key: The new key. Uppercase alphanumeric, starting with a letter, for example META.
-    description: What this key groups, shown alongside the other keys. It cannot be empty.
-    rationale: Why a new key is needed. This is written as a comment above the key, so a later reader sees the reasoning.
+    Args:
+        key: The new key. Uppercase alphanumeric, starting with a letter, for example META.
+        description: What this key groups, shown alongside the other keys. It cannot be empty.
+        rationale: Why a new key is needed. This is written as a comment above the key, so a later reader sees the reasoning.
     """
 
     _config().addKey(key=key, description=description, rationale=rationale)
@@ -292,9 +301,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     """
     Entry point for the `docket-mcp` console script.
 
-    argv: Argument list, accepted for symmetry with the CLI and currently unused.
+    Args:
+        argv: Argument list, accepted for symmetry with the CLI and currently unused.
 
-    Returns the process exit code.
+    Returns:
+        The process exit code.
     """
 
     # `MCPServer.run` owns the event loop, so no async runtime is imported here.
@@ -312,7 +323,8 @@ def _config() -> Config:
 
     This resolves per call rather than once at startup, so a key approved while the server is running is picked up without a restart.
 
-    Returns the loaded `Config`.
+    Returns:
+        The loaded `Config`.
     """
 
     return discoverConfig()
@@ -322,7 +334,8 @@ def _store() -> Store:
     """
     Build a store over the configuration governing the working directory.
 
-    Returns the store.
+    Returns:
+        The store.
     """
 
     return Store(_config())
@@ -334,9 +347,11 @@ def _json(payload: Any) -> str:
 
     Every tool returns JSON as text, which is unambiguous for the model to parse and stable to assert on in tests. It is written compactly, since an agent pays for every token of it.
 
-    payload: The data to encode.
+    Args:
+        payload: The data to encode.
 
-    Returns the encoded text.
+    Returns:
+        The encoded text.
     """
 
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))

@@ -22,10 +22,15 @@ def requireText(value: str, name: str) -> str:
 
     Whitespace counts as empty, since a title of spaces is as unusable as a title of nothing and would leave the same blank cell in every listing.
 
-    value: The value to check.
-    name: What to name in the error message, for example `title`.
+    Args:
+        value: The value to check.
+        name: What to name in the error message, for example `title`.
 
-    Returns the value unchanged, with its surrounding whitespace intact.
+    Returns:
+        The value unchanged, with its surrounding whitespace intact.
+
+    Raises:
+        EmptyValueError: The {name} cannot be empty.
     """
 
     if not value.strip():
@@ -40,10 +45,15 @@ def requireWritableFile(path: str, name: str) -> Path:
 
     The checks that can be made without touching the disk are made here, so a caller learns the destination is unusable before any work is done for it. A filesystem may still refuse the write afterwards for a reason no check can predict, which is why `writeFile` exists to catch that too.
 
-    path: The destination as the caller supplied it.
-    name: What to name in the error message, for example `--output path`.
+    Args:
+        path: The destination as the caller supplied it.
+        name: What to name in the error message, for example `--output path`.
 
-    Returns the destination as a `Path`.
+    Returns:
+        The destination as a `Path`.
+
+    Raises:
+        OutputPathError: The {name} '{path}' is a directory, not a file.
     """
 
     requireText(path, name)
@@ -72,11 +82,16 @@ def writeFile(path: Path, text: str, name: str) -> Path:
 
     Every check `requireWritableFile` can make is a prediction, and a prediction can be wrong. A refusal escaping here as a bare `OSError` would reach the user as a traceback rather than as a message, so it is translated instead.
 
-    path: The destination, already checked.
-    text: The content to write.
-    name: What to name in the error message, for example `--output path`.
+    Args:
+        path: The destination, already checked.
+        text: The content to write.
+        name: What to name in the error message, for example `--output path`.
 
-    Returns the path written.
+    Returns:
+        The path written.
+
+    Raises:
+        OutputPathError: Could not write the {name} '{path}': {error.strerror or error}.
     """
 
     try:

@@ -26,9 +26,11 @@ def lockPath(repoRoot: Path) -> Path:
     """
     Resolve where a repository's lock file belongs.
 
-    repoRoot: The directory holding `.docket.toml`.
+    Args:
+        repoRoot: The directory holding `.docket.toml`.
 
-    Returns the absolute path of the lock file.
+    Returns:
+        The absolute path of the lock file.
     """
 
     # Resolve the path, since the lock is shared per resolved path and two spellings of one directory must not produce two locks.
@@ -43,8 +45,9 @@ def sharedLock(repoRoot: Path, timeout: float) -> Iterator[None]:
     Any number of processes may read at once, and none of them may read while a writer holds the lock.
     This is what closes the window where a reader catches `setStatus` between writing the new file and removing the old one, and reports a duplicate id that never really existed.
 
-    repoRoot: The directory holding `.docket.toml`.
-    timeout: How long to wait for a writer to finish, in seconds.
+    Args:
+        repoRoot: The directory holding `.docket.toml`.
+        timeout: How long to wait for a writer to finish, in seconds.
     """
 
     with _held(repoRoot, timeout, writing=False):
@@ -59,8 +62,9 @@ def exclusiveLock(repoRoot: Path, timeout: float) -> Iterator[None]:
     One process writes at a time and no process reads while it does, so a read followed by a write back is indivisible from any other process's point of view.
     The whole read-modify-write span belongs inside the block, not just the write, because holding it for the write alone would still let two processes derive their changes from the same starting state.
 
-    repoRoot: The directory holding `.docket.toml`.
-    timeout: How long to wait for the current holder to finish, in seconds.
+    Args:
+        repoRoot: The directory holding `.docket.toml`.
+        timeout: How long to wait for the current holder to finish, in seconds.
     """
 
     with _held(repoRoot, timeout, writing=True):
@@ -77,9 +81,13 @@ def _held(repoRoot: Path, timeout: float, writing: bool) -> Iterator[None]:
 
     `filelock` raises its own `Timeout`, which no caller of `docket.core` should have to know about, so it is converted here into the error every other failure in this package already uses.
 
-    repoRoot: The directory holding `.docket.toml`.
-    timeout: How long to wait, in seconds.
-    writing: Whether to take the exclusive side rather than the shared one.
+    Args:
+        repoRoot: The directory holding `.docket.toml`.
+        timeout: How long to wait, in seconds.
+        writing: Whether to take the exclusive side rather than the shared one.
+
+    Raises:
+        LockTimeoutError: Another docket process has been {'writing to' if writing else 'locking'} {repoRoot} for longer than {timeout} seconds. Nothing was changed. Retry the call.
     """
 
     path: Path = lockPath(repoRoot)

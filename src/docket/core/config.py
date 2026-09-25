@@ -55,8 +55,12 @@ class Config:
         """
         Wrap a parsed document.
 
-        path: The path the document was read from, and the path `save` writes back to.
-        document: The parsed `tomlkit` document, retained for round-tripping.
+        Args:
+            path: The path the document was read from, and the path `save` writes back to.
+            document: The parsed `tomlkit` document, retained for round-tripping.
+
+        Raises:
+            ConfigError: defaultPriority {self.defaultPriority} is outside 0 through maxPriority {self.maxPriority} in {self.path}.
         """
 
         self.path: Path = path
@@ -144,7 +148,11 @@ class Config:
         """
         Return the `[keys]` table, creating it in the document when absent.
 
-        Returns the table.
+        Returns:
+            The table.
+
+        Raises:
+            ConfigError: Section '[{KEYS_TABLE}]' in {self.path} must be a table.
         """
 
         if KEYS_TABLE not in self.document:
@@ -163,7 +171,8 @@ class Config:
         A comment a human wrote elsewhere in the table is untouched, since only the run directly above the key is considered part of it.
         The table is rebuilt rather than edited in place, because deleting a comment line from the document's body directly would leave `tomlkit`'s internal index pointing at the wrong entries.
 
-        key: The key to drop.
+        Args:
+            key: The key to drop.
         """
 
         body: list[Any] = self.__keysTable().value.body
@@ -207,7 +216,8 @@ class Config:
         """
         Hold this repository's read lock, waiting no longer than the configured `lockTimeout`.
 
-        Returns the context manager to hold for the duration of the read.
+        Returns:
+            The context manager to hold for the duration of the read.
         """
 
         return sharedLock(self.repoRoot, self.lockTimeout)
@@ -216,7 +226,8 @@ class Config:
         """
         Hold this repository's write lock, waiting no longer than the configured `lockTimeout`.
 
-        Returns the context manager to hold for the duration of the read-modify-write.
+        Returns:
+            The context manager to hold for the duration of the read-modify-write.
         """
 
         return exclusiveLock(self.repoRoot, self.lockTimeout)
@@ -225,9 +236,11 @@ class Config:
         """
         Report whether a key has been approved.
 
-        key: The key to test.
+        Args:
+            key: The key to test.
 
-        Returns `True` when the key is registered.
+        Returns:
+            `True` when the key is registered.
         """
 
         return key in self.registeredKeys
@@ -238,9 +251,14 @@ class Config:
 
         The message points at `add_key`, since that is the recovery path an agent has.
 
-        key: The key to check.
+        Args:
+            key: The key to check.
 
-        Returns the same key.
+        Returns:
+            The same key.
+
+        Raises:
+            UnknownKeyError: Key '{key}' is not registered. Known keys: {known}. Ask the user whether to add a new one, then call add_key.
         """
 
         requireValidKey(key)
@@ -255,11 +273,16 @@ class Config:
         """
         Register a key so tickets may be created under it.
 
-        key: The key to register.
-        description: What the key groups, shown alongside the other keys.
-        rationale: Why the key was added, written as a comment above it so the reasoning survives in the file.
+        Args:
+            key: The key to register.
+            description: What the key groups, shown alongside the other keys.
+            rationale: Why the key was added, written as a comment above it so the reasoning survives in the file.
 
-        Returns the same key.
+        Returns:
+            The same key.
+
+        Raises:
+            InvalidKeyError: Key '{key}' is already registered.
         """
 
         requireValidKey(key)
@@ -292,8 +315,13 @@ class Config:
 
         Removing a key that tickets already carry would strand those tickets with an unknown key, so the caller passes the ids it found and this refuses loudly.
 
-        key: The key to remove.
-        usedBy: Ids of tickets currently carrying the key, if any.
+        Args:
+            key: The key to remove.
+            usedBy: Ids of tickets currently carrying the key, if any.
+
+        Raises:
+            InvalidKeyError: Key '{key}' cannot be removed because {len(usedBy)} ticket(s) use it: {', '.join(sorted(usedBy))}.
+            UnknownKeyError: Key '{key}' is not registered, so there is nothing to remove.
         """
 
         # Refuse while tickets depend on the key, and name them so the user can act.
@@ -330,9 +358,14 @@ def findConfigPath(startDir: Optional[Path] = None) -> Path:
 
     The walk stops at the git root, so a parent repository's configuration is never picked up by a nested one.
 
-    startDir: The directory to start from, defaulting to the current working directory.
+    Args:
+        startDir: The directory to start from, defaulting to the current working directory.
 
-    Returns the path to the configuration file.
+    Returns:
+        The path to the configuration file.
+
+    Raises:
+        ConfigNotFoundError: No {CONFIG_FILENAME} found. Searched: {', '.join(searched)}. Run 'docket deploy .' at the repository root to create one.
     """
 
     current: Path = (startDir if startDir is not None else Path.cwd()).resolve()
@@ -357,9 +390,11 @@ def loadConfig(configPath: Path) -> Config:
     """
     Parse a configuration file.
 
-    configPath: The path to read.
+    Args:
+        configPath: The path to read.
 
-    Returns the loaded `Config`.
+    Returns:
+        The loaded `Config`.
     """
 
     return Config(path=configPath, document=_parseDocument(configPath))
@@ -369,9 +404,14 @@ def _parseDocument(configPath: Path) -> TOMLDocument:
     """
     Read and parse a configuration file into a round-trippable document.
 
-    configPath: The path to read.
+    Args:
+        configPath: The path to read.
 
-    Returns the parsed document.
+    Returns:
+        The parsed document.
+
+    Raises:
+        ConfigError: Could not read {configPath}: {error}
     """
 
     try:
@@ -386,9 +426,11 @@ def discoverConfig(startDir: Optional[Path] = None) -> Config:
     """
     Find and load the configuration governing a directory.
 
-    startDir: The directory to start the walk from, defaulting to the current working directory.
+    Args:
+        startDir: The directory to start the walk from, defaulting to the current working directory.
 
-    Returns the loaded `Config`.
+    Returns:
+        The loaded `Config`.
     """
 
     return loadConfig(findConfigPath(startDir))

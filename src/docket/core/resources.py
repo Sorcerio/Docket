@@ -24,10 +24,12 @@ def readPackageText(directory: str, name: str) -> str:
 
     This goes through `importlib.resources` rather than a path derived from `__file__`, so it reads the same whether docket is installed as a wheel, run from a source checkout, or imported from a zip.
 
-    directory: The directory inside the package holding the file.
-    name: The filename.
+    Args:
+        directory: The directory inside the package holding the file.
+        name: The filename.
 
-    Returns the file text.
+    Returns:
+        The file text.
     """
 
     return files(PACKAGE_NAME).joinpath(directory, name).read_text(encoding="utf-8")

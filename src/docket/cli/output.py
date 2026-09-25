@@ -45,7 +45,8 @@ class Output:
         """
         Print human-facing output.
 
-        renderable: Anything `rich` can render.
+        Args:
+            renderable: Anything `rich` can render.
         """
 
         self.console.print(renderable)
@@ -56,7 +57,8 @@ class Output:
 
         Mermaid source goes through here, so redirecting it to a file or a pipe yields exactly the source and nothing else.
 
-        text: The text to write.
+        Args:
+            text: The text to write.
         """
 
         sys.stdout.write(text)
@@ -65,7 +67,8 @@ class Output:
         """
         Report a non-fatal warning.
 
-        message: The warning text.
+        Args:
+            message: The warning text.
         """
 
         self.errorConsole.print(Text(f"warning: {message}", style="yellow"))
@@ -74,7 +77,8 @@ class Output:
         """
         Report a failure.
 
-        message: The error text.
+        Args:
+            message: The error text.
         """
 
         self.errorConsole.print(Text(f"error: {message}", style="bold red"))
@@ -87,10 +91,12 @@ def buildContextTable(heading: str, entries: list[dict[str, object]]) -> Table:
     """
     Build the table showing one direction of a ticket's resolved dependencies.
 
-    heading: What to title the table.
-    entries: The resolved records.
+    Args:
+        heading: What to title the table.
+        entries: The resolved records.
 
-    Returns the table.
+    Returns:
+        The table.
     """
 
     table: Table = Table(title=heading, title_justify="left", box=None, pad_edge=False, title_style="bold")
@@ -119,10 +125,12 @@ def relativeToRoot(path: Optional[Path], root: Path) -> str:
     """
     Describe a path relative to a repository root, so output stays readable in a narrow terminal.
 
-    path: The path to describe.
-    root: The directory to describe it against.
+    Args:
+        path: The path to describe.
+        root: The directory to describe it against.
 
-    Returns the relative path, falling back to the absolute one when it lies outside the root.
+    Returns:
+        The relative path, falling back to the absolute one when it lies outside the root.
     """
 
     if path is None:

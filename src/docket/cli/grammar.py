@@ -55,9 +55,11 @@ def describeKeys(config: Optional[Config]) -> str:
 
     The registry is per-repository, so the options can only be named once a configuration has been found. Without one the description stays general rather than guessing.
 
-    config: The configuration holding the registry, or `None` when none was found.
+    Args:
+        config: The configuration holding the registry, or `None` when none was found.
 
-    Returns the sentence to append.
+    Returns:
+        The sentence to append.
     """
 
     if config is None:
@@ -75,9 +77,11 @@ def describePriorities(config: Optional[Config]) -> str:
 
     The band runs from 0 through the configured `maxPriority`, so like the key registry it can only be listed once a configuration has been found.
 
-    config: The configuration holding the band, or `None` when none was found.
+    Args:
+        config: The configuration holding the band, or `None` when none was found.
 
-    Returns the sentence to append.
+    Returns:
+        The sentence to append.
     """
 
     if config is None:
@@ -92,7 +96,8 @@ def tryDiscoverConfig() -> Optional[Config]:
 
     Only the help text depends on this, and every command that truly needs a configuration discovers it again through `dispatch`, so a missing one must not stop the parser from being built. That is what keeps `--help`, `--version`, and `deploy` working outside a repository.
 
-    Returns the loaded `Config`, or `None` when none could be loaded.
+    Returns:
+        The loaded `Config`, or `None` when none could be loaded.
     """
 
     try:
@@ -107,9 +112,11 @@ def classifyToken(token: str) -> Optional[str]:
 
     This is the whole of the rule that lets `docket list todo CORE 1` and `docket graph CORE-14` be written without a flag between them. The four classes cannot overlap, so no token is ever ambiguous and no ordering between the checks changes an answer.
 
-    token: The token to read.
+    Args:
+        token: The token to read.
 
-    Returns one of the `TOKEN_` names, or `None` when the token is none of them.
+    Returns:
+        One of the `TOKEN_` names, or `None` when the token is none of them.
     """
 
     if isValidId(token):
@@ -134,9 +141,11 @@ def rewriteIdFirst(argv: list[str]) -> list[str]:
 
     `docket CORE-14 done` is the shape a person types, and `argparse` cannot express "a subcommand, or else an id". It does not have to, because the two are distinguishable before parsing begins: every command name is lowercase and every id is an uppercase key followed by a hyphen and a number. So naming the branch is all this does, and the parser is left to do the rest, including the help and every error.
 
-    argv: The raw argument list.
+    Args:
+        argv: The raw argument list.
 
-    Returns the list to parse, unchanged when it does not open with an id.
+    Returns:
+        The list to parse, unchanged when it does not open with an id.
     """
 
     if not argv or not isValidId(argv[0]):
@@ -151,12 +160,18 @@ def resolveListFilters(tokens: list[str], status: Optional[str], key: Optional[s
 
     A token says which filter it is by its own shape, so `docket list todo CORE 1` needs no flags at all. The flags remain for scripts and for anyone who would rather be explicit, and naming one filter twice is refused rather than quietly resolved in whichever direction the code happens to read.
 
-    tokens: The bare filter tokens, in any order.
-    status: The status named by `--status`, or `None`.
-    key: The key named by `--key`, or `None`.
-    priorityMax: The ceiling named by `--priority-max`, or `None`.
+    Args:
+        tokens: The bare filter tokens, in any order.
+        status: The status named by `--status`, or `None`.
+        key: The key named by `--key`, or `None`.
+        priorityMax: The ceiling named by `--priority-max`, or `None`.
 
-    Returns the resolved `(status, key, priorityMax)` triple.
+    Returns:
+        The resolved `(status, key, priorityMax)` triple.
+
+    Raises:
+        InvalidArgumentError: '{token}' is a ticket id, which does not filter a list. Show it with '{PROGRAM_NAME} {token}'.
+        ConflictingArgumentsError: The {kind} filter was given twice, the second time as '{token}'. Pass it once.
     """
 
     # Held as text so one loop can fill any of the three, then converted back on the way out.
@@ -194,12 +209,18 @@ def resolveGraphScope(scope: Optional[str], ticketId: Optional[str], key: Option
 
     The three scopes remain exclusive rather than composing. A graph is scoped to one thing, and narrowing an already narrowed graph is what `list`'s filters are for.
 
-    scope: The bare scope token, or `None`.
-    ticketId: The id named by `--id`, or `None`.
-    key: The key named by `--key`, or `None`.
-    status: The status named by `--status`, or `None`.
+    Args:
+        scope: The bare scope token, or `None`.
+        ticketId: The id named by `--id`, or `None`.
+        key: The key named by `--key`, or `None`.
+        status: The status named by `--status`, or `None`.
 
-    Returns the resolved `(id, key, status)` triple, at most one of which is set.
+    Returns:
+        The resolved `(id, key, status)` triple, at most one of which is set.
+
+    Raises:
+        ConflictingArgumentsError: '{scope}' already scopes the graph, so it cannot be combined with -i/--id, -k/--key, or -s/--status.
+        InvalidArgumentError: Cannot read '{scope}' as a scope. Expected a ticket id, for example 'CORE-14', a key, or a status ({', '.join(STATUSES)}).
     """
 
     if scope is None:
@@ -226,9 +247,11 @@ def buildParser(config: Optional[Config] = None) -> argparse.ArgumentParser:
     """
     Build the top-level argument parser and every subcommand parser.
 
-    config: The configuration whose keys and priority band the help text names, or `None` to describe both in general terms.
+    Args:
+        config: The configuration whose keys and priority band the help text names, or `None` to describe both in general terms.
 
-    Returns the configured `argparse.ArgumentParser`.
+    Returns:
+        The configured `argparse.ArgumentParser`.
     """
 
     parser: argparse.ArgumentParser = argparse.ArgumentParser(
@@ -326,8 +349,9 @@ def addScopeArguments(parser: argparse.ArgumentParser, keyOptions: str) -> None:
 
     Both commands that draw a graph offer the same scopes, read by the same rules, and resolved by the same `resolveGraphScope`. Declaring them once is what keeps the two from drifting into disagreeing about what a bare token means.
 
-    parser: The parser to add the arguments to.
-    keyOptions: The sentence describing the registered keys, already built.
+    Args:
+        parser: The parser to add the arguments to.
+        keyOptions: The sentence describing the registered keys, already built.
     """
 
     parser.add_argument("scope", nargs="?", metavar="SCOPE", help=f"What to scope to, read from its own shape: a ticket id, a key, or a status ({', '.join(STATUSES)}). The flags below are the same three, named explicitly.")
@@ -344,10 +368,12 @@ def buildTicketParser(commands: argparse._SubParsersAction, priorityOptions: str
 
     `prog` is set to the program name alone, and the id is added before the subcommands, so `argparse` derives every child's usage line as `docket ID <command>`. That is exactly what was typed, rather than the placeholder the branch is registered under.
 
-    commands: The top-level subparser action to register into.
-    priorityOptions: The sentence describing the priority band, already built.
+    Args:
+        commands: The top-level subparser action to register into.
+        priorityOptions: The sentence describing the priority band, already built.
 
-    Returns the branch parser.
+    Returns:
+        The branch parser.
     """
 
     ticketParser: argparse.ArgumentParser = commands.add_parser(
@@ -392,9 +418,14 @@ def parseIdList(value: Optional[str]) -> Optional[list[str]]:
 
     Both `none` and an empty string yield an empty list rather than `None`, which is how `set --requires` clears a ticket's dependencies. The sentinel exists because PowerShell discards an empty-string argument before the process ever sees it, leaving the documented empty-string form unreachable on Windows.
 
-    value: The raw argument value.
+    Args:
+        value: The raw argument value.
 
-    Returns the ids, or `None` when the argument was absent.
+    Returns:
+        The ids, or `None` when the argument was absent.
+
+    Raises:
+        InvalidIdError: '{CLEAR_SENTINEL}' clears the whole list, so it cannot be combined with an id. Pass either '{CLEAR_SENTINEL}' alone or only ids.
     """
 
     if value is None:
@@ -418,10 +449,15 @@ def parseEditIdList(value: Optional[str], flag: str) -> Optional[list[str]]:
 
     Clearing is what `--requires` is for, so an empty result here means the caller named an edit and then named nothing to do, which is a usage error rather than a silent no-op.
 
-    value: The raw argument value.
-    flag: The flag the value came from, named in the error.
+    Args:
+        value: The raw argument value.
+        flag: The flag the value came from, named in the error.
 
-    Returns the ids, or `None` when the argument was absent.
+    Returns:
+        The ids, or `None` when the argument was absent.
+
+    Raises:
+        InvalidIdError: '{flag}' needs at least one id. Use '--requires {CLEAR_SENTINEL}' to clear the list instead.
     """
 
     entries: Optional[list[str]] = parseIdList(value)

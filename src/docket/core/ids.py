@@ -38,9 +38,11 @@ def isValidKey(key: str) -> bool:
     """
     Report whether a key matches the required form.
 
-    key: The key to test.
+    Args:
+        key: The key to test.
 
-    Returns `True` when the key is well formed.
+    Returns:
+        `True` when the key is well formed.
     """
 
     return bool(KEY_PATTERN.match(key))
@@ -50,9 +52,14 @@ def requireValidKey(key: str) -> str:
     """
     Return the key unchanged, raising when it is malformed.
 
-    key: The key to check.
+    Args:
+        key: The key to check.
 
-    Returns the same key.
+    Returns:
+        The same key.
+
+    Raises:
+        InvalidKeyError: Key '{key}' is malformed. A key must be uppercase alphanumeric and start with a letter, for example 'CORE'.
     """
 
     # Reject anything that is not uppercase alphanumeric starting with a letter.
@@ -68,9 +75,11 @@ def isValidId(ticketId: str) -> bool:
 
     This is the asking half of `parseId`, for a caller deciding what a token is rather than one that already knows.
 
-    ticketId: The id to test.
+    Args:
+        ticketId: The id to test.
 
-    Returns `True` when the id is well formed.
+    Returns:
+        `True` when the id is well formed.
     """
 
     return bool(ID_PATTERN.match(ticketId))
@@ -80,9 +89,14 @@ def parseId(ticketId: str) -> tuple[str, int]:
     """
     Split a ticket id into its key and its number.
 
-    ticketId: The id to split, for example `CORE-14`.
+    Args:
+        ticketId: The id to split, for example `CORE-14`.
 
-    Returns a `(key, number)` pair.
+    Returns:
+        A `(key, number)` pair.
+
+    Raises:
+        InvalidIdError: Id '{ticketId}' is malformed. An id must be a key, a hyphen, and a positive number, for example 'CORE-14'.
     """
 
     # Match the whole id so a trailing or leading fragment cannot slip through.
@@ -97,10 +111,15 @@ def formatId(key: str, number: int) -> str:
     """
     Build a ticket id from a key and a number.
 
-    key: The key the ticket belongs to.
-    number: The sequential number within that key.
+    Args:
+        key: The key the ticket belongs to.
+        number: The sequential number within that key.
 
-    Returns the formatted id.
+    Returns:
+        The formatted id.
+
+    Raises:
+        InvalidIdError: Number {number} is invalid. Ticket numbers start at 1.
     """
 
     # Validate both halves here so a malformed id can never be constructed.
@@ -115,9 +134,11 @@ def keyOf(ticketId: str) -> str:
     """
     Extract the key from a ticket id.
 
-    ticketId: The id to read.
+    Args:
+        ticketId: The id to read.
 
-    Returns the key portion.
+    Returns:
+        The key portion.
     """
 
     return parseId(ticketId)[0]
@@ -129,10 +150,12 @@ def nextNumber(key: str, existingIds: Iterable[str]) -> int:
 
     The result is always one past the highest number seen, never the lowest unused gap, so a deleted ticket's number is not reused.
 
-    key: The key to allocate within.
-    existingIds: Every ticket id currently in the set, of any key.
+    Args:
+        key: The key to allocate within.
+        existingIds: Every ticket id currently in the set, of any key.
 
-    Returns the next number to use.
+    Returns:
+        The next number to use.
     """
 
     requireValidKey(key)
@@ -153,10 +176,12 @@ def nextId(key: str, existingIds: Iterable[str]) -> str:
     """
     Derive the next available id for a key.
 
-    key: The key to allocate within.
-    existingIds: Every ticket id currently in the set.
+    Args:
+        key: The key to allocate within.
+        existingIds: Every ticket id currently in the set.
 
-    Returns the formatted next id.
+    Returns:
+        The formatted next id.
     """
 
     return formatId(key, nextNumber(key, existingIds))
@@ -171,9 +196,11 @@ def slugify(title: str) -> str:
 
     The slug is cut at the cap wherever that lands, mid-word included, since the id prefix is what makes the filename unique.
 
-    title: The ticket title to convert.
+    Args:
+        title: The ticket title to convert.
 
-    Returns the slug, or `untitled` when nothing survives.
+    Returns:
+        The slug, or `untitled` when nothing survives.
     """
 
     # Fold accented characters onto their ASCII bases, then drop anything still outside ASCII.
@@ -200,10 +227,12 @@ def buildFilename(ticketId: str, title: str) -> str:
 
     The id prefix is what makes the filename unique, which is why a slug collision between two titles is harmless and why a slug matching a Windows reserved device name is harmless too.
 
-    ticketId: The ticket's id, which is validated here.
-    title: The title the slug derives from.
+    Args:
+        ticketId: The ticket's id, which is validated here.
+        title: The title the slug derives from.
 
-    Returns the filename, including the `.md` extension.
+    Returns:
+        The filename, including the `.md` extension.
     """
 
     # Validate the id rather than trusting it, since this result is used as a path.

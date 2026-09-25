@@ -118,9 +118,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     """
     Entry point for the `docket` console script.
 
-    argv: Argument list to parse, defaulting to `sys.argv[1:]`.
+    Args:
+        argv: Argument list to parse, defaulting to `sys.argv[1:]`.
 
-    Returns the process exit code.
+    Returns:
+        The process exit code.
     """
 
     # Read the configuration before the parser is built, so the help text can name the keys and priorities this repository actually allows. A missing one is not fatal here, since the commands that need it say so themselves.
@@ -151,11 +153,13 @@ def dispatch(args: argparse.Namespace, config: Optional[Config], output: Output)
     """
     Route parsed arguments to the command that handles them.
 
-    args: The parsed arguments.
-    config: The configuration already discovered for the help text, or `None` when none was found.
-    output: Where to write.
+    Args:
+        args: The parsed arguments.
+        config: The configuration already discovered for the help text, or `None` when none was found.
+        output: Where to write.
 
-    Returns the process exit code.
+    Returns:
+        The process exit code.
     """
 
     # Deploy and upgrade run before a configuration exists, or in order to repair one, so they must not require discovering it first.
