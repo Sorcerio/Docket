@@ -51,9 +51,11 @@ def buildKeyBriefings(store: Store) -> list[KeyBriefing]:
 
     The whole ticket set is loaded once and every key allocates against that one snapshot, so the numbers cannot disagree with each other.
 
-    store: The store naming the configuration and the ticket root.
+    Args:
+        store: The store naming the configuration and the ticket root.
 
-    Returns one briefing per registered key, ordered by key.
+    Returns:
+        One briefing per registered key, ordered by key.
     """
 
     existingIds: list[str] = store.loadAll().ids()
@@ -70,9 +72,11 @@ def buildContext(store: Optional[Store]) -> dict[str, Any]:
 
     Run outside a repository there is nothing to gather, so the defaults stand in and the brief tells its reader to propose keys instead of choosing from them. That is the same document either way rather than a second mode.
 
-    store: The store for the repository the brief is being written for, or `None` when none was found.
+    Args:
+        store: The store for the repository the brief is being written for, or `None` when none was found.
 
-    Returns the render context.
+    Returns:
+        The render context.
     """
 
     # Without a configuration every value falls back to what a freshly deployed repository would have, since that is what the reader's tickets will eventually meet.
@@ -98,9 +102,11 @@ def renderHandoff(store: Optional[Store] = None) -> str:
     """
     Render the offsite authoring brief.
 
-    store: The store for the repository the brief is being written for, or `None` when none was found.
+    Args:
+        store: The store for the repository the brief is being written for, or `None` when none was found.
 
-    Returns the rendered document.
+    Returns:
+        The rendered document.
     """
 
     return renderDocument(HANDOFF_TEMPLATE, buildContext(store))

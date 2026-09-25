@@ -53,9 +53,11 @@ def buildContext(graph: ResolvedGraph) -> dict[str, Any]:
     """
     Gather what the document names about the graph it is drawn from.
 
-    graph: The graph the document draws, already scoped and culled.
+    Args:
+        graph: The graph the document draws, already scoped and culled.
 
-    Returns the render context.
+    Returns:
+        The render context.
     """
 
     return {
@@ -73,13 +75,15 @@ def buildRoadmap(store: Store, ticketId: Optional[str] = None, key: Optional[str
 
     Scoping happens before culling, so the ceiling is measured against what will actually be drawn rather than against the whole repository.
 
-    store: The store to read the tickets from.
-    ticketId: The ticket to center on, or `None`.
-    key: The key to scope to, or `None`.
-    status: The status to scope to, or `None`.
-    maxNodes: The node count to aim for, or zero for no ceiling.
+    Args:
+        store: The store to read the tickets from.
+        ticketId: The ticket to center on, or `None`.
+        key: The key to scope to, or `None`.
+        status: The status to scope to, or `None`.
+        maxNodes: The node count to aim for, or zero for no ceiling.
 
-    Returns the rendered document and what the ceiling cost.
+    Returns:
+        The rendered document and what the ceiling cost.
     """
 
     culled: CulledGraph = cullGraph(scopeGraph(resolveGraph(store.loadAll()), ticketId, key, status), maxNodes)

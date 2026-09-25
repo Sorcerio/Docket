@@ -61,9 +61,11 @@ def _transformWords(words: Iterable[str]) -> Iterator[str]:
     `textcase.title` alone is not usable here, because it capitalizes through `str.capitalize`, which lowercases the rest of the word and would turn `CLI` into `Cli`.
     A word is therefore left exactly as written whenever it carries capitalization or a digit of its own, which is what lets an acronym, a ticket id, and a version number survive a title that is otherwise rewritten.
 
-    words: The words the case split produced, in order.
+    Args:
+        words: The words the case split produced, in order.
 
-    Returns each word in the case it should carry.
+    Returns:
+        Each word in the case it should carry.
     """
 
     ordered: list[str] = list(words)
@@ -94,9 +96,11 @@ def toTitleCase(title: str) -> str:
 
     Runs of whitespace collapse to a single space and surrounding whitespace is dropped, since the split that finds the words is what removes them.
 
-    title: The title to convert.
+    Args:
+        title: The title to convert.
 
-    Returns the title in title case.
+    Returns:
+        The title in title case.
     """
 
     return titleCase(title, boundaries=[textcase.SPACE], strip_punctuation=False)
@@ -106,9 +110,11 @@ def isTitleCase(title: str) -> bool:
     """
     Report whether a title is already in title case.
 
-    title: The title to test.
+    Args:
+        title: The title to test.
 
-    Returns `True` when converting the title would change nothing.
+    Returns:
+        `True` when converting the title would change nothing.
     """
 
     return toTitleCase(title) == title

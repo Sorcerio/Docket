@@ -65,8 +65,9 @@ class DeployReport:
         """
         Note that a path was written.
 
-        path: The path written.
-        existed: Whether the file was already there.
+        Args:
+            path: The path written.
+            existed: Whether the file was already there.
         """
 
         (self.updated if existed else self.created).append(path)
@@ -75,7 +76,8 @@ class DeployReport:
         """
         Build the serializable form.
 
-        Returns the report as plain data.
+        Returns:
+            The report as plain data.
         """
 
         return {
@@ -94,9 +96,11 @@ def deploy(target: Path) -> DeployReport:
 
     This is idempotent. Missing pieces are created and templates are refreshed, but an existing `.docket.toml` is never rewritten, because it holds the key registry a human has curated.
 
-    target: The repository root to deploy into.
+    Args:
+        target: The repository root to deploy into.
 
-    Returns what was done.
+    Returns:
+        What was done.
     """
 
     root: Path = _requireDirectory(target)
@@ -134,9 +138,14 @@ def upgrade(target: Path) -> DeployReport:
     This rewrites what docket owns and nothing else. The configuration is left alone because it holds the key registry, and tickets are left alone because they are the repository's data.
     The `.gitignore` is the one file docket does not own but still appends to, since a repository deployed before the lock existed has no entry for it and would otherwise commit one.
 
-    target: The repository root to upgrade.
+    Args:
+        target: The repository root to upgrade.
 
-    Returns what was done.
+    Returns:
+        What was done.
+
+    Raises:
+        DeployError: No {CONFIG_FILENAME} in {root}. Run 'docket deploy {root}' first.
     """
 
     root: Path = _requireDirectory(target)
@@ -162,9 +171,11 @@ def readTemplate(name: str) -> str:
     """
     Read a template shipped inside the package.
 
-    name: The template filename.
+    Args:
+        name: The template filename.
 
-    Returns the template text.
+    Returns:
+        The template text.
     """
 
     return readPackageText(TEMPLATES_DIRECTORY, name)
@@ -176,8 +187,9 @@ def _writeClaudeTemplate(config: Config, report: DeployReport) -> None:
 
     This lands beside the tickets rather than at the repository root, so an agent opening the ticket directory reads it in place.
 
-    config: The loaded configuration, naming the ticket root.
-    report: The report to record the write against.
+    Args:
+        config: The loaded configuration, naming the ticket root.
+        report: The report to record the write against.
     """
 
     path: Path = config.rootPath / CLAUDE_FILENAME
@@ -193,8 +205,12 @@ def _mergeMcpConfig(root: Path, report: DeployReport) -> None:
 
     This is the step most likely to damage something, so it reads, modifies, and writes rather than overwriting. Docket's own entry is replaced and every other entry is preserved. A file that is not valid JSON is refused rather than clobbered.
 
-    root: The repository root.
-    report: The report to record the write against.
+    Args:
+        root: The repository root.
+        report: The report to record the write against.
+
+    Raises:
+        DeployError: {path} is not valid JSON, so it was left untouched: {error}
     """
 
     path: Path = root / MCP_FILENAME
@@ -232,8 +248,12 @@ def _ignoreLockFile(root: Path, report: DeployReport) -> None:
     The lock file is machine state rather than repository content, so committing it would put one developer's lock in another developer's checkout.
     Only the entry is appended. Everything already in the file is preserved, and a file that already covers the lock is left exactly as it is.
 
-    root: The repository root.
-    report: The report to record the write against.
+    Args:
+        root: The repository root.
+        report: The report to record the write against.
+
+    Raises:
+        DeployError: Could not read {path}: {error}
     """
 
     path: Path = root / GITIGNORE_FILENAME
@@ -266,9 +286,14 @@ def _requireDirectory(target: Path) -> Path:
     """
     Resolve a deploy target, refusing anything that is not an existing directory.
 
-    target: The path given by the caller.
+    Args:
+        target: The path given by the caller.
 
-    Returns the resolved directory.
+    Returns:
+        The resolved directory.
+
+    Raises:
+        DeployError: {resolved} is not a directory.
     """
 
     resolved: Path = target.resolve()
@@ -283,8 +308,9 @@ def _write(path: Path, text: str) -> None:
     """
     Write a file, creating its parent directories.
 
-    path: Where to write.
-    text: What to write.
+    Args:
+        path: Where to write.
+        text: What to write.
     """
 
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -97,7 +97,8 @@ class ResolvedGraph:
         """
         Count the nodes.
 
-        Returns the node count.
+        Returns:
+            The node count.
         """
 
         return len(self.nodes)
@@ -106,9 +107,11 @@ class ResolvedGraph:
         """
         Report whether a node is present.
 
-        ticketId: The id to test.
+        Args:
+            ticketId: The id to test.
 
-        Returns `True` when the graph holds the node.
+        Returns:
+            `True` when the graph holds the node.
         """
 
         return ticketId in self.nodes
@@ -119,7 +122,8 @@ class ResolvedGraph:
         """
         List every key present, sorted.
 
-        Returns the keys.
+        Returns:
+            The keys.
         """
 
         return sorted({node.key for node in self.nodes.values()})
@@ -128,9 +132,11 @@ class ResolvedGraph:
         """
         List the nodes carrying one key, ordered by ticket number.
 
-        key: The key to select.
+        Args:
+            key: The key to select.
 
-        Returns the ordered nodes.
+        Returns:
+            The ordered nodes.
         """
 
         return sorted((node for node in self.nodes.values() if node.key == key), key=lambda node: parseId(node.id)[1])
@@ -161,9 +167,11 @@ def resolveGraph(ticketSet: TicketSet) -> ResolvedGraph:
 
     A `requires` entry naming an id that does not exist is dropped here rather than raising, because reporting it is `validate`'s job and the graph still has to render around it.
 
-    ticketSet: The loaded tickets.
+    Args:
+        ticketSet: The loaded tickets.
 
-    Returns the resolved graph.
+    Returns:
+        The resolved graph.
     """
 
     tickets: dict[str, Ticket] = ticketSet.tickets
@@ -201,9 +209,11 @@ def subgraphForId(graph: ResolvedGraph, ticketId: str) -> ResolvedGraph:
     """
     Scope a graph to one ticket's transitive ancestors and descendants.
 
-    ticketId: The ticket at the centre.
+    Args:
+        ticketId: The ticket at the centre.
 
-    Returns the scoped graph.
+    Returns:
+        The scoped graph.
     """
 
     if ticketId not in graph.nodes:
@@ -223,9 +233,11 @@ def subgraphForKey(graph: ResolvedGraph, key: str) -> ResolvedGraph:
 
     The neighbors are marked external so a renderer can show where the key ends.
 
-    key: The key to scope to.
+    Args:
+        key: The key to scope to.
 
-    Returns the scoped graph.
+    Returns:
+        The scoped graph.
     """
 
     members: set[str] = {node.id for node in graph.nodes.values() if node.key == key}
@@ -253,10 +265,12 @@ def subgraphForStatus(graph: ResolvedGraph, status: str) -> ResolvedGraph:
 
     Nothing is borrowed from outside, unlike the key scope. A key has a boundary worth drawing, since the work either side of it is still related, but the tickets around a status are only the same work at a different moment, so pulling them in would put every other status back on the page. An edge therefore survives only when both of its ends carry the status, which is what lets the result read as the ordering within that status alone.
 
-    graph: The graph to scope.
-    status: The status to scope to.
+    Args:
+        graph: The graph to scope.
+        status: The status to scope to.
 
-    Returns the scoped graph.
+    Returns:
+        The scoped graph.
     """
 
     members: set[str] = {node.id for node in graph.nodes.values() if node.status == status}
@@ -270,12 +284,14 @@ def scopeGraph(graph: ResolvedGraph, ticketId: Optional[str] = None, key: Option
 
     The three remain exclusive, so the first one set is the one that applies and a caller passing two has already been refused by the grammar that read them. Checking that a key is registered or that a status is spelled correctly belongs to the caller, since the CLI and the server learn those from different places and report them differently.
 
-    graph: The graph to scope.
-    ticketId: The ticket to center on, or `None`.
-    key: The key to scope to, or `None`.
-    status: The status to scope to, or `None`.
+    Args:
+        graph: The graph to scope.
+        ticketId: The ticket to center on, or `None`.
+        key: The key to scope to, or `None`.
+        status: The status to scope to, or `None`.
 
-    Returns the scoped graph, or the same graph when nothing scoped it.
+    Returns:
+        The scoped graph, or the same graph when nothing scoped it.
     """
 
     if ticketId is not None:
@@ -300,10 +316,12 @@ def cullGraph(graph: ResolvedGraph, maxNodes: int) -> CulledGraph:
 
     A ring that will not fit whole is filled in id order, so the same graph always culls to the same nodes and a committed document does not churn between runs.
 
-    graph: The graph to narrow.
-    maxNodes: The node count to aim for, or zero and below for no ceiling at all.
+    Args:
+        graph: The graph to narrow.
+        maxNodes: The node count to aim for, or zero and below for no ceiling at all.
 
-    Returns the narrowed graph and the number of nodes it cost.
+    Returns:
+        The narrowed graph and the number of nodes it cost.
     """
 
     # Nothing to do when no ceiling was asked for, or when the graph already sits under the one that was.
@@ -348,10 +366,12 @@ def dependencyContext(ticketSet: TicketSet, ticketId: str) -> dict[str, list[dic
 
     The file stores bare ids in one direction only, so both the title and status of each dependency, and the entire reverse direction, have to be resolved here. This is what lets `read_ticket` be useful without the file duplicating anything.
 
-    ticketSet: The loaded tickets.
-    ticketId: The ticket to resolve context for.
+    Args:
+        ticketSet: The loaded tickets.
+        ticketId: The ticket to resolve context for.
 
-    Returns a mapping of `requires` and `requiredBy` to summary records.
+    Returns:
+        A mapping of `requires` and `requiredBy` to summary records.
     """
 
     graph: ResolvedGraph = resolveGraph(ticketSet)
@@ -377,10 +397,12 @@ def ticketReadiness(ticketSet: TicketSet, ticketId: str) -> Readiness:
 
     A dependency naming a ticket that does not exist blocks, since a link the reader cannot follow is not the same as clear road. A cycle blocks without a special case, because no ticket in one is ever done.
 
-    ticketSet: The loaded tickets.
-    ticketId: The ticket to judge.
+    Args:
+        ticketSet: The loaded tickets.
+        ticketId: The ticket to judge.
 
-    Returns the readiness of that ticket.
+    Returns:
+        The readiness of that ticket.
     """
 
     return _readinessOf(ticketSet, ticketSet.get(ticketId))
@@ -392,10 +414,12 @@ def readyTickets(ticketSet: TicketSet, tickets: Iterable[Ticket]) -> list[Ticket
 
     The whole set is needed to judge any one ticket, so the candidates are passed separately from the set they are judged against. That is what lets a caller filter an already narrowed listing.
 
-    ticketSet: The loaded tickets, which every dependency is looked up in.
-    tickets: The candidates to filter.
+    Args:
+        ticketSet: The loaded tickets, which every dependency is looked up in.
+        tickets: The candidates to filter.
 
-    Returns the ready candidates.
+    Returns:
+        The ready candidates.
     """
 
     return [ticket for ticket in tickets if _readinessOf(ticketSet, ticket).isReady]
@@ -407,9 +431,11 @@ def findCycles(graph: ResolvedGraph) -> list[list[str]]:
 
     Tarjan's algorithm is used iteratively rather than recursively, so a deep chain cannot exhaust the interpreter stack.
 
-    graph: The graph to search.
+    Args:
+        graph: The graph to search.
 
-    Returns one sorted member list per cycle, ordered for stable output.
+    Returns:
+        One sorted member list per cycle, ordered for stable output.
     """
 
     index: dict[str, int] = {}
@@ -479,10 +505,12 @@ def _readinessOf(ticketSet: TicketSet, ticket: Ticket) -> Readiness:
     """
     Judge one already-loaded ticket, which is what both public entry points do their work through.
 
-    ticketSet: The loaded tickets, which every dependency is looked up in.
-    ticket: The ticket to judge.
+    Args:
+        ticketSet: The loaded tickets, which every dependency is looked up in.
+        ticket: The ticket to judge.
 
-    Returns the readiness of that ticket.
+    Returns:
+        The readiness of that ticket.
     """
 
     # A finished ticket has no work left to be ready for, so it is not ready and nothing is holding it back.
@@ -498,9 +526,11 @@ def _isSatisfied(ticketSet: TicketSet, requiredId: str) -> bool:
     """
     Report whether one dependency is met.
 
-    requiredId: The id the depending ticket names.
+    Args:
+        requiredId: The id the depending ticket names.
 
-    Returns `True` only when the id names a ticket that exists and is done.
+    Returns:
+        `True` only when the id names a ticket that exists and is done.
     """
 
     required: Optional[Ticket] = ticketSet.tickets.get(requiredId)
@@ -512,10 +542,12 @@ def _contextEntry(ticketSet: TicketSet, ticketId: str) -> dict[str, object]:
     """
     Build one resolved dependency record.
 
-    ticketSet: The loaded tickets to look the ticket up in.
-    ticketId: The id to describe.
+    Args:
+        ticketSet: The loaded tickets to look the ticket up in.
+        ticketId: The id to describe.
 
-    Returns the record, flagged when the id names nothing that exists.
+    Returns:
+        The record, flagged when the id names nothing that exists.
     """
 
     ticket: Optional[Ticket] = ticketSet.tickets.get(ticketId)
@@ -531,11 +563,13 @@ def _reachable(graph: ResolvedGraph, startId: str, forward: bool) -> set[str]:
 
     The visited set makes this safe on a graph that already contains a cycle, which matters because `validate` has to render a broken graph in order to explain it.
 
-    graph: The graph to walk.
-    startId: The node to walk from.
-    forward: Walk `requires` when `True`, `requiredBy` when `False`.
+    Args:
+        graph: The graph to walk.
+        startId: The node to walk from.
+        forward: Walk `requires` when `True`, `requiredBy` when `False`.
 
-    Returns the reachable ids, excluding the start unless a cycle leads back to it.
+    Returns:
+        The reachable ids, excluding the start unless a cycle leads back to it.
     """
 
     seen: set[str] = set()
@@ -560,11 +594,13 @@ def _restrict(graph: ResolvedGraph, included: set[str], scope: Optional[str]) ->
 
     Each node keeps its full edge lists, so a caller can still see that a node has neighbors outside the scope. Only the rendered edges are narrowed.
 
-    graph: The graph to restrict.
-    included: The ids to keep.
-    scope: What the result is scoped to.
+    Args:
+        graph: The graph to restrict.
+        included: The ids to keep.
+        scope: What the result is scoped to.
 
-    Returns the restricted graph.
+    Returns:
+        The restricted graph.
     """
 
     nodes: dict[str, GraphNode] = {ticketId: graph.nodes[ticketId] for ticketId in included if ticketId in graph.nodes}
@@ -576,9 +612,11 @@ def _buildEdges(nodes: dict[str, GraphNode]) -> list[Edge]:
     """
     Build the edge list for a node set, keeping only edges with both ends present.
 
-    nodes: The nodes to connect.
+    Args:
+        nodes: The nodes to connect.
 
-    Returns the edges, sorted for stable output.
+    Returns:
+        The edges, sorted for stable output.
     """
 
     edges: list[Edge] = []
@@ -594,9 +632,11 @@ def _orderedIds(ids: Iterable[str]) -> list[str]:
     """
     Sort ids by key and then numerically, so `CORE-2` precedes `CORE-10`.
 
-    ids: The ids to sort.
+    Args:
+        ids: The ids to sort.
 
-    Returns the sorted ids.
+    Returns:
+        The sorted ids.
     """
 
     return sorted(ids, key=_idSortKey)
@@ -606,9 +646,11 @@ def _idSortKey(ticketId: str) -> tuple[str, int]:
     """
     Build the ordering key for one id.
 
-    ticketId: The id to order.
+    Args:
+        ticketId: The id to order.
 
-    Returns a `(key, number)` tuple.
+    Returns:
+        A `(key, number)` tuple.
     """
 
     return parseId(ticketId)

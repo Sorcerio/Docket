@@ -72,9 +72,11 @@ def renderGraph(graph: ResolvedGraph) -> str:
     """
     Render a resolved graph to mermaid source.
 
-    graph: The graph to render.
+    Args:
+        graph: The graph to render.
 
-    Returns the mermaid source, with a trailing newline and no code fence.
+    Returns:
+        The mermaid source, with a trailing newline and no code fence.
     """
 
     lines: list[str] = [GRAPH_HEADER]
@@ -102,9 +104,11 @@ def renderNode(node: GraphNode) -> str:
 
     Status and priority are each said twice, once in a way a bare renderer keeps and once in a way it drops. The shape and the label survive anywhere, while the fill and the border are the richer reading for a renderer that honors `classDef`. So nothing a reader needs is only ever a color.
 
-    node: The node to render.
+    Args:
+        node: The node to render.
 
-    Returns the declaration line.
+    Returns:
+        The declaration line.
     """
 
     opening, closing = STATUS_SHAPES.get(node.status, DEFAULT_SHAPE)
@@ -118,9 +122,11 @@ def renderLabel(node: GraphNode) -> str:
 
     The id, the title, and the priority and status sit on their own lines rather than running together, since the id is what a reader scans for and a title beside it buries the id.
 
-    node: The node to label.
+    Args:
+        node: The node to label.
 
-    Returns the label, with its lines joined by mermaid's line break.
+    Returns:
+        The label, with its lines joined by mermaid's line break.
     """
 
     lines: list[str] = [escapeLabel(node.id), *wrapLabel(node.title), f"p{node.priority} {escapeLabel(node.status)}"]
@@ -134,9 +140,11 @@ def wrapLabel(text: str) -> list[str]:
 
     Wrapping happens before escaping, so an entity the escape introduces can neither be counted toward the width nor be broken across two lines. A single word longer than the width is left whole, because breaking an id or a path mid-word costs the reader more than the width does.
 
-    text: The title to wrap.
+    Args:
+        text: The title to wrap.
 
-    Returns the escaped lines, empty when there is no title to show.
+    Returns:
+        The escaped lines, empty when there is no title to show.
     """
 
     if not text.strip():
@@ -149,9 +157,11 @@ def renderEdge(edge: Edge) -> str:
     """
     Render one edge.
 
-    edge: The edge to render.
+    Args:
+        edge: The edge to render.
 
-    Returns the edge line, pointing from dependency to dependent.
+    Returns:
+        The edge line, pointing from dependency to dependent.
     """
 
     return f"{sanitizeId(edge.fromId)} --> {sanitizeId(edge.toId)}"
@@ -163,9 +173,11 @@ def renderStyles(graph: ResolvedGraph) -> list[str]:
 
     A class carries the fill of a status and the border of a priority together, rather than a node taking one class for each. Combining them is what keeps every node to a single class, and it means only the combinations actually present are ever declared.
 
-    graph: The graph to style.
+    Args:
+        graph: The graph to style.
 
-    Returns the style lines, empty when there is nothing to style.
+    Returns:
+        The style lines, empty when there is nothing to style.
     """
 
     if not graph.nodes:
@@ -200,10 +212,12 @@ def statusClassName(status: str, priority: int) -> str:
 
     The priority is named by its band rather than by its number, so the class count stays bounded however high the configured ceiling goes.
 
-    status: The status the class fills for.
-    priority: The priority the class borders for.
+    Args:
+        status: The status the class fills for.
+        priority: The priority the class borders for.
 
-    Returns the class name.
+    Returns:
+        The class name.
     """
 
     return f"{status}P{priorityBand(priority)}"
@@ -213,9 +227,11 @@ def priorityStroke(priority: int) -> str:
     """
     Select the border for one priority.
 
-    priority: The priority to style.
+    Args:
+        priority: The priority to style.
 
-    Returns the stroke declaration.
+    Returns:
+        The stroke declaration.
     """
 
     return PRIORITY_STROKES[priorityBand(priority)]
@@ -227,9 +243,11 @@ def priorityBand(priority: int) -> int:
 
     Everything past the end shares the lightest border, since the configured ceiling can sit anywhere above it and a band nobody can distinguish is not worth a class of its own.
 
-    priority: The priority to place.
+    Args:
+        priority: The priority to place.
 
-    Returns the index.
+    Returns:
+        The index.
     """
 
     return min(max(priority, 0), len(PRIORITY_STROKES) - 1)
@@ -241,9 +259,11 @@ def sanitizeId(ticketId: str) -> str:
 
     Mermaid dislikes a hyphen in an identifier, so it becomes an underscore. The hyphenated id stays in the label, which is what the reader sees.
 
-    ticketId: The id to convert.
+    Args:
+        ticketId: The id to convert.
 
-    Returns the identifier.
+    Returns:
+        The identifier.
     """
 
     return ticketId.replace("-", "_")
@@ -255,9 +275,11 @@ def escapeLabel(text: str) -> str:
 
     A title is free text, so it may hold a quote or an angle bracket that would otherwise end the label early or be read as markup.
 
-    text: The text to escape.
+    Args:
+        text: The text to escape.
 
-    Returns the escaped text.
+    Returns:
+        The escaped text.
     """
 
     escaped: str = text
