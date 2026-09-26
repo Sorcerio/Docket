@@ -85,7 +85,8 @@ Unknown fields are round-tripped untouched. Filenames are frozen at creation so 
 A ticket id is the command:
 
 ```bash
-docket CORE-14         # show it, dependency context and all
+docket CORE-14         # show it, dependency context and all, with the body rendered as Markdown
+docket CORE-14 show --plain  # the same content as bare text, body left raw
 docket CORE-14 done    # todo, wip, or done. The file follows
 docket CORE-14 set [-t TEXT] [-p N] [-r A,B|none] [-ra A,B] [-rr A,B]
 docket CORE-14 meta [KEY [VALUE]] [-c]
@@ -101,6 +102,7 @@ docket CORE-14 requires     # one id per line, nothing when empty
 docket CORE-14 required-by  # the reverse direction, same shape
 docket CORE-14 key          # CORE
 docket CORE-14 ready        # true or false. Every dependency done?
+docket CORE-14 body         # the raw Markdown body, no frontmatter
 docket CORE-14 meta         # the whole map as JSON
 docket CORE-14 meta KEY     # one value, bare, or JSON when it has structure
 ```

@@ -52,6 +52,7 @@ ACCESSORS: dict[str, str] = {
     "required-by": "Print the ids of the tickets depending on this one, one per line. Prints nothing when there are none.",
     "key": "Print the key portion of the ticket's id and nothing else.",
     "ready": "Print whether every dependency is done, as a bare true or false.",
+    "body": "Print the ticket's body as raw Markdown, with no frontmatter. Prints nothing when it is empty.",
 }
 
 # The command that reads each frontmatter field. `id` has none, since it is what was typed to reach the ticket, and `metadata` is read through `meta` because that command also writes it. A field missing from here fails the suite, which is what keeps a new field from arriving without a way to read it.
@@ -409,7 +410,11 @@ def buildTicketParser(commands: argparse._SubParsersAction, priorityOptions: str
     # Not required, so a bare id parses and falls through to showing the ticket.
     ticketCommands = ticketParser.add_subparsers(dest="ticketCommand", metavar="COMMAND")
 
-    ticketCommands.add_parser("show", help="Show the ticket with its resolved dependency context. This is what a bare id does.", formatter_class=RichHelpFormatter)
+    # A bare id never reaches the show parser, so the ticket parser carries the default it would otherwise leave unset.
+    ticketParser.set_defaults(plain=False)
+
+    showParser: argparse.ArgumentParser = ticketCommands.add_parser("show", help="Show the ticket with its resolved dependency context. This is what a bare id does.", formatter_class=RichHelpFormatter)
+    showParser.add_argument("--plain", action="store_true", help="Write the same content as bare text, with no styling and the body left as raw Markdown. Use `cat` for the raw file.")
 
     # Every read is registered from the one table, so a new one needs no parser code of its own.
     for accessor, accessorHelp in ACCESSORS.items():

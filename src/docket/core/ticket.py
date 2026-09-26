@@ -96,6 +96,14 @@ class Ticket:
 
         return self.status == STATUS_DONE
 
+    @property
+    def trimmedBody(self) -> str:
+        """
+        The body without the blank lines framing it, which is how every reader presents it.
+        """
+
+        return self.body.strip("\n")
+
     # MARK: Functions
 
     def toFrontmatter(self) -> dict[str, Any]:
