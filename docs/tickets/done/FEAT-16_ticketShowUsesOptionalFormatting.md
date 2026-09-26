@@ -1,7 +1,7 @@
 ---
 id: FEAT-16
 title: Ticket Show Uses Optional Formatting
-status: todo
+status: done
 priority: 2
 requires: []
 metadata: {}
