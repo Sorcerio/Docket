@@ -30,7 +30,7 @@ from docket.core.validate import SEVERITY_ERROR, ValidationReport, validate
 
 # MARK: Constants
 
-# How each accessor in the grammar reads its answer off a ticket. The store is passed alongside the ticket because a derived answer, such as the reverse dependencies or readiness, cannot be read from one ticket alone. A list comes back for a list of ids, which `commandField` prints one per line.
+# How each accessor in the grammar reads its answer off a ticket. The store is passed alongside the ticket because a derived answer, such as the reverse dependencies or readiness, cannot be read from one ticket alone. A list comes back for a list of ids, or for the lines of the body, which `commandField` prints one per line so an empty one prints nothing at all.
 FIELD_READERS: dict[str, Callable[[Store, Ticket], object]] = {
     "title": lambda store, ticket: ticket.title,
     "status": lambda store, ticket: ticket.status,
@@ -39,6 +39,7 @@ FIELD_READERS: dict[str, Callable[[Store, Ticket], object]] = {
     "required-by": lambda store, ticket: [entry["id"] for entry in dependencyContext(store.loadAll(), ticket.id)["requiredBy"]],
     "key": lambda store, ticket: ticket.key,
     "ready": lambda store, ticket: ticketReadiness(store.loadAll(), ticket.id).isReady,
+    "body": lambda store, ticket: ticket.trimmedBody.splitlines(),
 }
 
 # MARK: Functions

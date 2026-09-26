@@ -231,7 +231,7 @@ def buildTicketBody(ticket: Ticket) -> Markdown:
         The body as rendered Markdown.
     """
 
-    return Markdown(ticket.body.strip("\n"))
+    return Markdown(ticket.trimmedBody)
 
 
 def contextRows(entries: list[dict[str, object]]) -> list[tuple[Text, Text, Text]]:
@@ -308,9 +308,8 @@ def plainTicket(ticket: Ticket, context: dict[str, list[dict[str, object]]], roo
         sections.append(f"{heading}\n{_alignRows(rows)}")
 
     # The body goes last and untouched, and an empty one adds nothing rather than a stray blank section.
-    body: str = ticket.body.strip("\n")
-    if body:
-        sections.append(body)
+    if ticket.trimmedBody:
+        sections.append(ticket.trimmedBody)
 
     return "\n\n".join(sections) + "\n"
 

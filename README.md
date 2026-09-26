@@ -102,6 +102,7 @@ docket CORE-14 requires     # one id per line, nothing when empty
 docket CORE-14 required-by  # the reverse direction, same shape
 docket CORE-14 key          # CORE
 docket CORE-14 ready        # true or false. Every dependency done?
+docket CORE-14 body         # the raw Markdown body, no frontmatter
 docket CORE-14 meta         # the whole map as JSON
 docket CORE-14 meta KEY     # one value, bare, or JSON when it has structure
 ```

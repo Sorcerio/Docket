@@ -956,6 +956,41 @@ def testAnEmptyIdListPrintsNothing(inRepo: Path, capsys: pytest.CaptureFixture[s
     assert capsys.readouterr().out == ""
 
 
+def testBodyPrintsTheRawMarkdown(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The body goes out exactly as written, with none of the frontmatter above it and none of the rendering `show` applies.
+    """
+
+    main(["new", "CORE", "App Shell", "--body", "Goal: a **window**.\n\nThen a `menu`."])
+    capsys.readouterr()
+
+    assert main(["CORE-1", "body"]) == EXIT_OK
+
+    out: str = capsys.readouterr().out
+
+    assert out.startswith("# App Shell\n")
+    assert out.endswith("Goal: a **window**.\n\nThen a `menu`.\n")
+    assert "title:" not in out
+    assert "\x1b" not in out
+
+
+def testAnEmptyBodyPrintsNothing(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    No body is no lines, the same way no ids is, rather than one blank line.
+    """
+
+    main(["new", "CORE", "App Shell"])
+
+    # Cut everything after the closing delimiter, leaving a ticket that is only frontmatter.
+    path: Path = inRepo / "docs" / "tickets" / "todo" / "CORE-1_appShell.md"
+    text: str = path.read_text(encoding="utf-8")
+    path.write_text(text[: text.index("---\n", 4) + 4], encoding="utf-8")
+    capsys.readouterr()
+
+    assert main(["CORE-1", "body"]) == EXIT_OK
+    assert capsys.readouterr().out == ""
+
+
 @pytest.mark.parametrize("accessor", sorted(ACCESSORS))
 def testAnAccessorOnAnUnknownTicketFails(inRepo: Path, capsys: pytest.CaptureFixture[str], accessor: str) -> None:
     """

@@ -52,6 +52,7 @@ ACCESSORS: dict[str, str] = {
     "required-by": "Print the ids of the tickets depending on this one, one per line. Prints nothing when there are none.",
     "key": "Print the key portion of the ticket's id and nothing else.",
     "ready": "Print whether every dependency is done, as a bare true or false.",
+    "body": "Print the ticket's body as raw Markdown, with no frontmatter. Prints nothing when it is empty.",
 }
 
 # The command that reads each frontmatter field. `id` has none, since it is what was typed to reach the ticket, and `metadata` is read through `meta` because that command also writes it. A field missing from here fails the suite, which is what keeps a new field from arriving without a way to read it.
