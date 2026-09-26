@@ -188,6 +188,130 @@ def testShowReportsAMissingDependency(inRepo: Path, capsys: pytest.CaptureFixtur
     assert "missing" in capsys.readouterr().out
 
 
+def testShowRendersTheBodyAsMarkdown(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The body is rendered rather than printed, so its Markdown syntax does not reach the reader.
+    """
+
+    main(["new", "CORE", "App Shell", "--body", "Goal: a **window** that `opens`."])
+    capsys.readouterr()
+
+    main(["CORE-1", "show"])
+
+    out: str = capsys.readouterr().out
+
+    assert "Goal: a window that opens." in out
+    assert "**" not in out
+    assert "`" not in out
+
+
+def testShowListsTheFileAndFrontmatter(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    The header carries every field the file does, along with where the file lives.
+    """
+
+    main(["new", "CORE", "App Shell", "--priority", "1"])
+    capsys.readouterr()
+
+    main(["CORE-1", "show"])
+
+    out: str = capsys.readouterr().out
+
+    assert "CORE-1  App Shell" in out
+    assert "Priority" in out
+    assert "CORE-1_appShell.md" in out
+
+
+def testShowListsMetadataAndExtraFields(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Both free-form maps are shown entry by entry, with structured values written as compact JSON.
+    """
+
+    main(["new", "CORE", "App Shell"])
+    main(["CORE-1", "meta", "video", "2026-01-devlog"])
+
+    # Add a field the schema does not recognize, the way a consumer repo would extend it.
+    path: Path = inRepo / "docs" / "tickets" / "todo" / "CORE-1_appShell.md"
+    path.write_text(path.read_text(encoding="utf-8").replace("---\n", "---\nowners: [ana, ben]\n", 1), encoding="utf-8")
+    capsys.readouterr()
+
+    main(["CORE-1", "show"])
+
+    out: str = capsys.readouterr().out
+
+    assert "Metadata" in out
+    assert "video: 2026-01-devlog" in out
+    assert "Extra" in out
+    assert 'owners: ["ana", "ben"]' in out
+
+
+def testShowHidesEmptyMaps(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    An empty map adds nothing, rather than a label with no value beside it.
+    """
+
+    main(["new", "CORE", "App Shell"])
+    capsys.readouterr()
+
+    main(["CORE-1", "show"])
+
+    out: str = capsys.readouterr().out
+
+    assert "Metadata" not in out
+    assert "Extra" not in out
+
+
+def testShowPlainLeavesTheBodyRaw(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    `--plain` keeps the resolved context but writes the body exactly as it was written, Markdown and all.
+    """
+
+    main(["new", "CORE", "App Shell"])
+    main(["new", "CORE", "Skirmish Setup", "--requires", "CORE-1", "--body", "Goal: a **window** that `opens`."])
+    capsys.readouterr()
+
+    assert main(["CORE-2", "show", "--plain"]) == EXIT_OK
+
+    out: str = capsys.readouterr().out
+
+    assert out.startswith("CORE-2  Skirmish Setup\n")
+    assert "Requires\nID      STATUS  TITLE\nCORE-1  todo    App Shell\n" in out
+    assert "Required by\nID    STATUS  TITLE\nnone\n" in out
+    assert out.endswith("Goal: a **window** that `opens`.\n")
+
+
+def testShowPlainListsTheSameFields(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """
+    Plain drops the styling, never the content, so every header row appears aligned as it does in the panel.
+    """
+
+    main(["new", "CORE", "App Shell"])
+    main(["CORE-1", "meta", "video", "2026-01-devlog"])
+    main(["CORE-1", "meta", "clip", "intro"])
+    capsys.readouterr()
+
+    main(["CORE-1", "show", "--plain"])
+
+    out: str = capsys.readouterr().out
+
+    assert "Status    todo\n" in out
+    assert "Metadata  video: 2026-01-devlog\n          clip: intro\n" in out
+
+
+def testShowPlainWritesNoEscapeSequences(inRepo: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Plain bypasses `rich` entirely, so a forced color terminal still receives bare text.
+    """
+
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    main(["new", "CORE", "App Shell"])
+    capsys.readouterr()
+
+    main(["CORE-1", "show", "--plain"])
+
+    assert "\x1b[" not in capsys.readouterr().out
+
+
 def testShowOnAnUnknownIdFails(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """
     Showing a ticket that does not exist is an error.
@@ -1570,11 +1694,11 @@ def testShorthandFlagsDriveNewAndSet(inRepo: Path, capsys: pytest.CaptureFixture
 
     capsys.readouterr()
 
-    main(["GEN-1"])
+    main(["GEN-1", "show", "--plain"])
     out: str = capsys.readouterr().out
 
     assert "Renamed" in out
-    assert "priority 3" in out
+    assert "Priority  3" in out
 
 
 def testShorthandFlagsDriveListAndGraph(inRepo: Path, capsys: pytest.CaptureFixture[str]) -> None:

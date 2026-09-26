@@ -16,7 +16,7 @@ from rich.table import Table
 from rich.text import Text
 
 from docket.cli.grammar import ACCESSORS, EXIT_INVALID, EXIT_OK, EXIT_USAGE, OUTPUT_ARGUMENT, parseEditIdList, parseIdList, resolveGraphScope, resolveListFilters
-from docket.cli.output import STATUS_STYLES, Output, buildContextTable, relativeToRoot
+from docket.cli.output import STATUS_STYLES, Output, buildContextTable, buildTicketBody, buildTicketPanel, plainTicket, relativeToRoot
 from docket.core.config import Config, discoverConfig
 from docket.core.deploy import DeployReport, deploy, upgrade
 from docket.core.handoff import HANDOFF_FILENAME, renderHandoff
@@ -111,7 +111,7 @@ def commandShow(args: argparse.Namespace, store: Store, output: Output) -> int:
     """
     Show a ticket with its resolved dependency context.
 
-    The raw file carries bare ids in one direction only, so this resolves the titles and statuses the file deliberately does not duplicate. Use `cat` for the raw file.
+    The raw file carries bare ids in one direction only, so this resolves the titles and statuses the file deliberately does not duplicate. The body is rendered as Markdown unless `--plain` asks for the same content as bare text. Use `cat` for the raw file.
 
     Args:
         args: The parsed arguments.
@@ -124,10 +124,16 @@ def commandShow(args: argparse.Namespace, store: Store, output: Output) -> int:
 
     loaded: TicketSet = store.loadAll()
     ticket: Ticket = loaded.get(args.id)
-    context = dependencyContext(loaded, args.id)
+    context: dict[str, list[dict[str, object]]] = dependencyContext(loaded, args.id)
+    root: Path = store.config.repoRoot
 
-    output.print(Text(f"{ticket.id}  {ticket.title}", style="bold"))
-    output.print(f"status [{STATUS_STYLES.get(ticket.status, 'white')}]{ticket.status}[/]  priority {ticket.priority}  key {ticket.key}")
+    # Plain carries everything the styled form does, only without the styling or the rendering.
+    if args.plain:
+        output.raw(plainTicket(ticket, context, root))
+
+        return EXIT_OK
+
+    output.print(buildTicketPanel(ticket, root))
 
     # Show both directions, since the reverse one is the whole reason the file can afford to store only forward edges.
     output.print("")
@@ -136,7 +142,7 @@ def commandShow(args: argparse.Namespace, store: Store, output: Output) -> int:
     output.print(buildContextTable("Required by", context["requiredBy"]))
 
     output.print("")
-    output.print(ticket.body.strip("\n"))
+    output.print(buildTicketBody(ticket))
 
     return EXIT_OK
 

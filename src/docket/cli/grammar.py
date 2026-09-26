@@ -409,7 +409,11 @@ def buildTicketParser(commands: argparse._SubParsersAction, priorityOptions: str
     # Not required, so a bare id parses and falls through to showing the ticket.
     ticketCommands = ticketParser.add_subparsers(dest="ticketCommand", metavar="COMMAND")
 
-    ticketCommands.add_parser("show", help="Show the ticket with its resolved dependency context. This is what a bare id does.", formatter_class=RichHelpFormatter)
+    # A bare id never reaches the show parser, so the ticket parser carries the default it would otherwise leave unset.
+    ticketParser.set_defaults(plain=False)
+
+    showParser: argparse.ArgumentParser = ticketCommands.add_parser("show", help="Show the ticket with its resolved dependency context. This is what a bare id does.", formatter_class=RichHelpFormatter)
+    showParser.add_argument("--plain", action="store_true", help="Write the same content as bare text, with no styling and the body left as raw Markdown. Use `cat` for the raw file.")
 
     # Every read is registered from the one table, so a new one needs no parser code of its own.
     for accessor, accessorHelp in ACCESSORS.items():
